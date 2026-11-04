@@ -1,0 +1,9 @@
+# CI: lint, typecheck, Vitest, Playwright (diaktifkan setelah package.json tersedia)
+name: CI
+on:
+  workflow_dispatch:
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "CI belum dikonfigurasi"

@@ -1,0 +1,16 @@
+node_modules/
+.next/
+out/
+coverage/
+playwright-report/
+test-results/
+
+.env
+.env*.local
+
+# Data asli pelanggan (UU PDP No. 27/2022), jangan di-commit
+data/raw/
+
+.vercel
+*.log
+.DS_Store

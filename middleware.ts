@@ -1,0 +1,1 @@
+// Proteksi rute area internal
