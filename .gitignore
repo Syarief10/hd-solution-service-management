@@ -14,3 +14,11 @@ data/raw/
 .vercel
 *.log
 .DS_Store
+
+# dari create-next-app
+/.pnp
+.pnp.*
+*.pem
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*

@@ -21,5 +21,16 @@ supabase/                   Migration dan seed
 tests/                      Unit (Vitest) dan e2e (Playwright)
 ```
 
+## Menjalankan
+Butuh Node.js 20 atau lebih baru.
+```
+npm install
+cp .env.example .env.local   # isi kunci Supabase
+npm run dev                  # http://localhost:3000
+```
+Skrip lain: `npm run lint`, `npm run typecheck`, `npm run build`.
+
+Proyek dibuat dengan `create-next-app` (Next.js App Router, TypeScript, Tailwind CSS, ESLint, folder `src/`).
+
 ## Dokumentasi
 Dokumen perancangan (proposal, BPMN, ERD, mockup, progress) disimpan di luar repo: _tambahkan link di sini_.
