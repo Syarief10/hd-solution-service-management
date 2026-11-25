@@ -30,6 +30,21 @@ npm run dev                  # http://localhost:3000
 ```
 Skrip lain: `npm run lint`, `npm run typecheck`, `npm run build`.
 
+Cek koneksi Supabase: buka `http://localhost:3000/api/kesehatan`, hasilnya harus `{"ok":true,"supabase":"tersambung"}`.
+
+## Supabase
+- Variabel lingkungan ada di `.env.example` (URL proyek dan kunci publishable/anon). Isi juga di Vercel: Settings > Environment Variables. Kunci `service_role` tidak dipakai dan tidak boleh ada di repo.
+- Klien: `src/lib/supabase/client.ts` (Client Component) dan `src/lib/supabase/server.ts` (Server Component, Server Function, Route Handler).
+- Migration ada di `supabase/migrations/`. Tanpa Docker; penerapan ke cloud hanya setelah uji kering dan persetujuan tim.
+
+### Generate ulang tipe database
+Jalankan setelah setiap migration diterapkan, lalu commit `src/types/database.ts`:
+```
+npx supabase login
+npx supabase gen types typescript --project-id rizdsvhvflqugkyttoxw --schema public > src/types/database.ts
+```
+Alternatif tanpa CLI: alat `generate_typescript_types` di konektor MCP Supabase, salin hasilnya ke berkas yang sama.
+
 Proyek dibuat dengan `create-next-app` (Next.js App Router, TypeScript, Tailwind CSS, ESLint, folder `src/`).
 
 ## Dokumentasi
