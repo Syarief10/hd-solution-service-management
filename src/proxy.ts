@@ -2,12 +2,13 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+import { tujuanAman } from "@/lib/navigasi";
 import type { Database } from "@/types/database";
 
 // Proteksi rute area internal (dasbor, tiket, garansi, rekap):
 // - memperbarui sesi Supabase di setiap permintaan,
-// - belum masuk: rute internal diarahkan ke /login,
-// - sudah masuk: /login diarahkan ke /dashboard.
+// - belum masuk: rute internal diarahkan ke /login?next=<halaman asal>,
+// - sudah masuk: /login diarahkan ke halaman asal (atau /dashboard).
 // Ini pemeriksaan awal. Akses data tetap dibatasi RLS di database.
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -37,10 +38,11 @@ export async function proxy(request: NextRequest) {
   const halamanLogin = request.nextUrl.pathname === "/login";
 
   if (!sudahMasuk && !halamanLogin) {
-    return alihkan(request, response, "/login");
+    const asal = request.nextUrl.pathname + request.nextUrl.search;
+    return alihkan(request, response, `/login?${new URLSearchParams({ next: asal })}`);
   }
   if (sudahMasuk && halamanLogin) {
-    return alihkan(request, response, "/dashboard");
+    return alihkan(request, response, tujuanAman(request.nextUrl.searchParams.get("next")));
   }
 
   // Halaman internal tidak disimpan cache browser, supaya tombol Kembali
@@ -52,10 +54,12 @@ export async function proxy(request: NextRequest) {
 }
 
 // Redirect sambil membawa cookie sesi yang baru disegarkan atau dihapus.
+// `tujuan` berupa path internal, boleh berisi query (contoh /login?next=%2Ftiket).
 function alihkan(request: NextRequest, response: NextResponse, tujuan: string) {
+  const target = new URL(tujuan, request.url);
   const url = request.nextUrl.clone();
-  url.pathname = tujuan;
-  url.search = "";
+  url.pathname = target.pathname;
+  url.search = target.search;
   const redirect = NextResponse.redirect(url);
   response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
   return redirect;

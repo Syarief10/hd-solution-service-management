@@ -1,22 +1,35 @@
-// Layout area internal pemilik (bottom nav pada mobile).
-// Sementara hanya bilah atas dengan tombol Keluar; navigasi menyusul.
-import { keluar } from "./actions";
+// Layout area internal pemilik (issue #7): sidebar dan header di desktop,
+// header ringkas dan navigasi bawah di mobile (< 768 px).
+import { Suspense } from "react";
+
+import { HeaderDesktop } from "@/components/layout/HeaderDesktop";
+import { HeaderMobile } from "@/components/layout/HeaderMobile";
+import { DaftarNavBawah, NavBawah } from "@/components/layout/NavBawah";
+import { Sidebar } from "@/components/layout/Sidebar";
+import { ToastProvider } from "@/components/ui";
 
 export default function InternalLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-1 flex-col bg-slate-50">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
-        <p className="font-semibold text-slate-900">HD Solution Computer</p>
-        <form action={keluar}>
-          <button
-            type="submit"
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
-          >
-            Keluar
-          </button>
-        </form>
-      </header>
-      <div className="flex-1">{children}</div>
-    </div>
+    <ToastProvider>
+      <a
+        href="#konten"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-4 focus:py-3 focus:text-sm focus:font-semibold focus:text-primary focus:shadow"
+      >
+        Lewati ke konten
+      </a>
+      <div className="flex min-h-screen flex-1 bg-bg">
+        <Sidebar />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <HeaderDesktop />
+          <HeaderMobile />
+          <main id="konten" tabIndex={-1} className="flex-1 pb-28 focus:outline-none md:pb-0">
+            {children}
+          </main>
+        </div>
+      </div>
+      <Suspense fallback={<DaftarNavBawah pathname="" />}>
+        <NavBawah />
+      </Suspense>
+    </ToastProvider>
   );
 }
