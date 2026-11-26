@@ -30,7 +30,7 @@ npm run dev                  # http://localhost:3000
 ```
 Skrip lain: `npm run lint`, `npm run typecheck`, `npm run test` (Vitest), `npm run test:e2e` (Playwright), `npm run build`.
 
-E2E memakai Chrome yang terpasang di komputer. Tes e2e tidak boleh menyimpan data ke proyek Supabase tim.
+E2E memakai Chrome yang terpasang di komputer. Tes e2e tidak boleh menyimpan data ke proyek Supabase tim. Tes login memakai akun uji `E2E_EMAIL` dan `E2E_PASSWORD` di `.env.local` dan dijalankan terpisah dengan `npm run test:e2e:login`.
 
 Cek koneksi Supabase: buka `http://localhost:3000/api/kesehatan`, hasilnya harus `{"ok":true,"supabase":"tersambung"}`.
 

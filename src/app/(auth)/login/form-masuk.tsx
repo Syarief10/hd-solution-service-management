@@ -1,14 +1,18 @@
 "use client";
 
-import { useActionState } from "react";
+import { Suspense, useActionState } from "react";
 
 import { masuk } from "./actions";
+import { InputTujuan } from "./input-tujuan";
 
 export function FormMasuk() {
   const [status, aksi, memproses] = useActionState(masuk, undefined);
 
   return (
     <form action={aksi} className="space-y-5" noValidate>
+      <Suspense fallback={null}>
+        <InputTujuan />
+      </Suspense>
       {status?.pesan && (
         <div
           role="alert"

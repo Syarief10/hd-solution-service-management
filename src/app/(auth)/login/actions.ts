@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 
+import { tujuanAman } from "@/lib/navigasi";
 import { createClient } from "@/lib/supabase/server";
 
 export type StatusMasuk = { pesan: string; email: string } | undefined;
@@ -33,5 +34,6 @@ export async function masuk(_sebelumnya: StatusMasuk, formData: FormData): Promi
     return { pesan: PESAN_GAGAL, email };
   }
 
-  redirect("/dashboard");
+  // Kembali ke halaman yang tadi diminta; tujuan selain rute internal diganti /dashboard.
+  redirect(tujuanAman(String(formData.get("next") ?? "")));
 }

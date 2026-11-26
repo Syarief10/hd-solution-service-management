@@ -1,4 +1,8 @@
+import { loadEnvConfig } from "@next/env";
 import { defineConfig, devices } from "@playwright/test";
+
+// Membaca .env.local (termasuk akun uji E2E_EMAIL dan E2E_PASSWORD) seperti Next.js.
+loadEnvConfig(process.cwd());
 
 const PORT = Number(process.env.PORT ?? 3000);
 const CI = Boolean(process.env.CI);
