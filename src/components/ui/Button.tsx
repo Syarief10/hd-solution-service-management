@@ -10,10 +10,10 @@ export type UkuranTombol = "normal" | "kecil";
 // Target sentuh minimal 44 px (NFR-03). Ukuran "kecil" hanya untuk tombol di dalam
 // baris padat di desktop; tetap 36 px tinggi dengan area klik yang jelas.
 const VARIAN: Record<VarianTombol, string> = {
-  primer: "bg-primary text-white hover:bg-primary-hover disabled:bg-primary/50",
+  primer: "border-transparent bg-primary text-white hover:bg-primary-hover disabled:bg-primary/50",
   sekunder: "border-slate-300 bg-surface text-ink hover:bg-slate-50 disabled:text-slate-400",
-  bahaya: "bg-red-700 text-white hover:bg-red-800 disabled:bg-red-700/50",
-  hantu: "bg-transparent text-ink hover:bg-slate-100 disabled:text-slate-400",
+  bahaya: "border-transparent bg-red-700 text-white hover:bg-red-800 disabled:bg-red-700/50",
+  hantu: "border-transparent bg-transparent text-ink hover:bg-slate-100 disabled:text-slate-400",
 };
 
 const UKURAN: Record<UkuranTombol, string> = {
@@ -23,7 +23,7 @@ const UKURAN: Record<UkuranTombol, string> = {
 
 export function kelasTombol({ varian = "primer", ukuran = "normal", className }: { varian?: VarianTombol; ukuran?: UkuranTombol; className?: string } = {}) {
   return cx(
-    "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-transparent font-semibold leading-none",
+    "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg border font-semibold leading-none",
     "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
     "disabled:cursor-not-allowed",
     VARIAN[varian],
