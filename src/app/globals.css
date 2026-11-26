@@ -32,3 +32,14 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
 }
+
+/* Tanda terima: ukuran A5, tanpa latar abu-abu. */
+@media print {
+  @page {
+    size: A5;
+    margin: 12mm;
+  }
+  body {
+    background: #ffffff;
+  }
+}

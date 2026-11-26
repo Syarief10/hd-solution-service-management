@@ -33,7 +33,7 @@ export function DaftarNavBawah({ pathname }: { pathname: string }) {
   return (
     <nav
       aria-label="Navigasi utama"
-      className="fixed inset-x-0 bottom-0 z-30 flex items-center border-t border-border bg-surface px-2 pt-1.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 flex items-center print:hidden! [body:has([data-sembunyikan-nav])_&]:hidden border-t border-border bg-surface px-2 pt-1.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] md:hidden"
     >
       {item(dasbor)}
       {item(tiket)}

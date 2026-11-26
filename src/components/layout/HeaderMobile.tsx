@@ -8,7 +8,7 @@ import { Ikon } from "@/components/ui";
 /** Header mobile (< 768 px): logo, nama toko, tanggal, dan menu akun berisi Keluar. */
 export function HeaderMobile() {
   return (
-    <header className="sticky top-0 z-30 flex items-center gap-2.5 border-b border-border bg-surface px-4 py-3 md:hidden">
+    <header className="sticky top-0 z-30 print:hidden! flex items-center gap-2.5 border-b border-border bg-surface px-4 py-3 md:hidden">
       <LogoHD className="size-9 text-[13px]" />
       <div className="flex min-w-0 flex-1 flex-col gap-px">
         <span className="truncate text-base font-bold text-ink">HD Solution Computer</span>
