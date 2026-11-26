@@ -1,3 +1,5 @@
+import { connection } from "next/server";
+
 import { createClient } from "@/lib/supabase/server";
 
 // Status akhir menurut skema database (keputusan K1).
@@ -6,6 +8,8 @@ const STATUS_AKHIR = ["selesai", "dikembalikan", "dibatalkan"] as const;
 
 /** Jumlah tiket aktif di samping menu Tiket Servis. Hanya membaca data. */
 export async function JumlahTiketAktif() {
+  // Klien Supabase memeriksa masa berlaku sesi dengan Date.now(); tandai sebagai data per permintaan.
+  await connection();
   const supabase = await createClient();
   const { count, error } = await supabase
     .from("tiket")
