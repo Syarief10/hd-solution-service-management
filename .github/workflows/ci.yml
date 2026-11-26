@@ -1,9 +1,10 @@
-# CI: lint, typecheck, build (Vitest dan Playwright ditambahkan saat tes pertama ditulis)
+# CI: lint, typecheck, unit test, build, lalu e2e yang tidak menulis data.
 name: CI
 on:
   push:
     branches: [main]
   pull_request:
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -16,4 +17,43 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm run test
       - run: npm run build
+
+  e2e:
+    needs: check
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+      # Diisi di Settings > Secrets and variables > Actions. Tanpa keduanya, e2e dilewati.
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+    steps:
+      - name: Cek konfigurasi Supabase
+        id: cek
+        run: |
+          if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ] || [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
+            echo "::notice::Secret Supabase belum diisi, e2e dilewati."
+            echo "lewati=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.cek.outputs.lewati != 'true'
+      - uses: actions/setup-node@v4
+        if: steps.cek.outputs.lewati != 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        if: steps.cek.outputs.lewati != 'true'
+      - run: npx playwright install --with-deps chromium
+        if: steps.cek.outputs.lewati != 'true'
+      - run: npm run build
+        if: steps.cek.outputs.lewati != 'true'
+      - run: npm run test:e2e
+        if: steps.cek.outputs.lewati != 'true'
+      - uses: actions/upload-artifact@v4
+        if: failure() && steps.cek.outputs.lewati != 'true'
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
