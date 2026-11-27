@@ -74,6 +74,10 @@ test.describe("@tulis alur utama Iterasi 1", () => {
     await dialog.getByRole("radio", { name: new RegExp(`^${ke}`) }).check();
     await isi(dialog);
     await dialog.getByRole("button", { name: "Simpan Perubahan" }).click();
+    // Langkah kirim pemberitahuan: pratinjau pesan berisi status baru, lalu dilewati (tidak membuka WhatsApp).
+    await expect(dialog.getByRole("heading", { name: "Kirim Pemberitahuan" })).toBeVisible();
+    await expect(dialog.getByLabel("Pratinjau pesan")).toContainText("kini berstatus");
+    await dialog.getByRole("button", { name: "Lewati" }).click();
     await expect(dialog).toBeHidden();
     await expect(page.getByRole("heading", { level: 1 }).locator("..")).toContainText(ke);
   }

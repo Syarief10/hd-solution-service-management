@@ -8,6 +8,7 @@ import { POLA_UUID } from "@/lib/tiket/detail";
 import { skemaCatatan, skemaRincian, type IsianRincian } from "@/lib/tiket/estimasi";
 import { barisKomponen, skemaKomponen, validasiKomponen, type IsianKomponen } from "@/lib/tiket/komponen";
 import { tanggalJakarta } from "@/lib/format";
+import { TINDAK_LANJUT } from "@/lib/whatsapp";
 import { butuhBiaya, susunCatatan, validasiIsianStatus, type IsianStatus } from "@/lib/tiket/perbarui";
 import { DAFTAR_STATUS, isAktif } from "@/lib/tiket/status";
 import { createClient } from "@/lib/supabase/server";
@@ -22,7 +23,7 @@ function pesanDatabase(error: { code?: string; message: string } | null): string
   return GAGAL_UMUM;
 }
 
-async function siapkan(tiketId: string) {
+async function siapkan(tiketId: string, opsi: { bolehTertutup?: boolean } = {}) {
   if (!POLA_UUID.test(tiketId)) return { gagal: "Tiket tidak ditemukan." } as const;
   const db = await createClient();
   const { data: sesi } = await db.auth.getClaims();
@@ -34,7 +35,7 @@ async function siapkan(tiketId: string) {
     .maybeSingle();
   if (error) return { gagal: GAGAL_UMUM } as const;
   if (!t) return { gagal: "Tiket tidak ditemukan." } as const;
-  if (!isAktif(t.status)) return { gagal: "Tiket sudah ditutup dan tidak bisa diubah." } as const;
+  if (!isAktif(t.status) && !opsi.bolehTertutup) return { gagal: "Tiket sudah ditutup dan tidak bisa diubah." } as const;
   return { db, t } as const;
 }
 
@@ -367,6 +368,70 @@ export async function perbaruiStatus(tiketId: string, isian: IsianStatus): Promi
     if (s.t.pakai_komponen === null) await s.db.from("tiket").update({ pakai_komponen: true }).eq("tiket_id", tiketId);
   }
   return { ok: true, ke: isi.data.ke };
+}
+
+// ---------------------------------------------------------------------------
+// Pemberitahuan WhatsApp (Iterasi 2, K6)
+// ---------------------------------------------------------------------------
+
+const JENIS_PEMBERITAHUAN = ["tanda_terima", "estimasi", ...DAFTAR_STATUS] as const;
+
+/**
+ * Catat bahwa pemilik membuka WhatsApp untuk mengirim pesan (hasil "menunggu").
+ * Boleh untuk tiket yang baru saja berakhir (misalnya kabar Dikembalikan).
+ */
+export async function catatPemberitahuan(tiketId: string, jenis: string): Promise<HasilAksi & { id?: string }> {
+  const j = z.enum(JENIS_PEMBERITAHUAN).safeParse(jenis);
+  if (!j.success) return { ok: false, pesan: "Jenis pemberitahuan tidak dikenal." };
+  const s = await siapkan(tiketId, { bolehTertutup: true });
+  if ("gagal" in s) return { ok: false, pesan: s.gagal! };
+  const { data, error } = await s.db.from("pemberitahuan").insert({ tiket_id: tiketId, jenis: j.data, hasil: "menunggu" }).select("pemberitahuan_id").single();
+  if (error) {
+    catat("catat pemberitahuan", error);
+    return { ok: false, pesan: pesanDatabase(error) };
+  }
+  return { ok: true, id: data.pemberitahuan_id };
+}
+
+/** Jawaban "Sudah terkirim?": Ya → terkirim, Belum → gagal (lalu wajib dicatat tindak lanjutnya). */
+export async function tandaiPemberitahuan(tiketId: string, pemberitahuanId: string, terkirim: boolean): Promise<HasilAksi> {
+  if (!POLA_UUID.test(pemberitahuanId)) return { ok: false, pesan: "Pemberitahuan tidak ditemukan." };
+  const s = await siapkan(tiketId, { bolehTertutup: true });
+  if ("gagal" in s) return { ok: false, pesan: s.gagal! };
+  const { error } = await s.db
+    .from("pemberitahuan")
+    .update({ hasil: terkirim ? "terkirim" : "gagal", tindak_lanjut: null, diperbarui_at: new Date().toISOString() })
+    .eq("pemberitahuan_id", pemberitahuanId)
+    .eq("tiket_id", tiketId);
+  if (error) {
+    catat("tandai pemberitahuan", error);
+    return { ok: false, pesan: pesanDatabase(error) };
+  }
+  return { ok: true, pesan: terkirim ? "Ditandai terkirim" : "Ditandai belum terkirim. Catat tindak lanjutnya." };
+}
+
+export async function catatTindakLanjut(tiketId: string, pemberitahuanId: string, tindakLanjut: string, catatan: string): Promise<HasilAksi> {
+  if (!POLA_UUID.test(pemberitahuanId)) return { ok: false, pesan: "Pemberitahuan tidak ditemukan." };
+  const isi = z
+    .object({
+      tindakLanjut: z.enum(TINDAK_LANJUT, { error: "Pilih tindak lanjut." }),
+      catatan: z.string().trim().max(300, "Catatan maksimal 300 karakter."),
+    })
+    .safeParse({ tindakLanjut, catatan });
+  if (!isi.success) return { ok: false, pesan: isi.error.issues[0].message };
+  const s = await siapkan(tiketId, { bolehTertutup: true });
+  if ("gagal" in s) return { ok: false, pesan: s.gagal! };
+  const { error } = await s.db
+    .from("pemberitahuan")
+    .update({ tindak_lanjut: isi.data.tindakLanjut, catatan: isi.data.catatan || null, diperbarui_at: new Date().toISOString() })
+    .eq("pemberitahuan_id", pemberitahuanId)
+    .eq("tiket_id", tiketId)
+    .eq("hasil", "gagal");
+  if (error) {
+    catat("catat tindak lanjut", error);
+    return { ok: false, pesan: pesanDatabase(error) };
+  }
+  return { ok: true, pesan: "Tindak lanjut tercatat" };
 }
 
 // ---------------------------------------------------------------------------

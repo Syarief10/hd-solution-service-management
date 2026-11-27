@@ -15,7 +15,9 @@ import {
   TombolSalin,
 } from "./aksi-klien";
 import { AksiKomponen, PilihanPakaiKomponen, TambahKomponen } from "./komponen-klien";
+import { TombolKirimWa } from "./pemberitahuan-klien";
 import { PerbaruiStatus } from "./perbarui-status";
+import type { DataPesan } from "@/lib/whatsapp";
 import { Badge, ButtonLink, Card, cx, Ikon, StatusBadge } from "@/components/ui";
 import { formatNomorWa, formatRupiah, formatTanggal, formatTanggalWaktu } from "@/lib/format";
 import {
@@ -53,7 +55,7 @@ const KELAS_DL = "grid grid-cols-[120px_minmax(0,1fr)] gap-x-3 gap-y-2 text-[13p
 // Header dan lintasan
 // ---------------------------------------------------------------------------
 
-export function HeaderTiket({ t, sekarang }: { t: DetailTiket; sekarang: Date }) {
+export function HeaderTiket({ t, sekarang, wa }: { t: DetailTiket; sekarang: Date; wa: { nomorWa: string; data: DataPesan } }) {
   const terlambat = hariTerlambat(t, sekarang);
   const besok = jatuhTempoBesok(t, sekarang);
   const tertutup = !isAktif(t.status);
@@ -110,6 +112,7 @@ export function HeaderTiket({ t, sekarang }: { t: DetailTiket; sekarang: Date })
             keputusan={t.keputusan}
             biaya={Number(t.biaya)}
             estimasi_biaya={t.estimasi_biaya === null ? null : Number(t.estimasi_biaya)}
+            wa={wa}
           />
         )}
       </div>
@@ -324,7 +327,7 @@ export function TabProgres({ t }: { t: DetailTiket }) {
 // Tab Estimasi & Persetujuan (#19, K4)
 // ---------------------------------------------------------------------------
 
-export function TabEstimasi({ t }: { t: DetailTiket }) {
+export function TabEstimasi({ t, wa }: { t: DetailTiket; wa: { nomorWa: string; pesan: string | null } }) {
   const aktif = isAktif(t.status);
   const menunggu = t.keputusan === "menunggu";
   const bisaBukaUlang = aktif && !menunggu && ["diterima", "didiagnosis"].includes(t.status);
@@ -376,6 +379,16 @@ export function TabEstimasi({ t }: { t: DetailTiket }) {
             <Badge nada="peringatan" ikon="hourglass" className="self-start">
               Menunggu konfirmasi
             </Badge>
+            {aktif && wa.pesan && (
+              <div className="flex flex-col gap-1.5">
+                <p className="text-[13px] text-slate-700">
+                  {t.pemberitahuan.some((p) => p.jenis === "estimasi" && p.hasil === "terkirim")
+                    ? "Estimasi sudah dikirim ke pelanggan. Catat jawabannya di bawah."
+                    : "Kirim estimasi ke pelanggan, lalu catat jawabannya di bawah."}
+                </p>
+                <TombolKirimWa tiketId={t.tiket_id} jenis="estimasi" nomorWa={wa.nomorWa} pesan={wa.pesan} label="Kirim Estimasi via WhatsApp" varian="sekunder" className="self-start" />
+              </div>
+            )}
             {aktif ? <FormKeputusan tiketId={t.tiket_id} adaEstimasi={t.estimasi_biaya !== null} /> : <p className="text-[13px] text-muted">Tidak ada keputusan tercatat.</p>}
           </>
         ) : (

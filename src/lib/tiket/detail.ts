@@ -18,7 +18,8 @@ const KOLOM = `
   catatan_pengerjaan ( catatan_id, isi, created_at ),
   rincian_estimasi ( rincian_id, jenis, uraian, biaya, created_at ),
   spare_part ( sparepart_id, nama_komponen, status_pengadaan, biaya, lama_garansi_hari, tanggal_pesan, estimasi_tiba, tanggal_tiba, tanggal_pasang ),
-  transaksi ( transaksi_id, jenis, metode, nominal, tanggal, created_at )
+  transaksi ( transaksi_id, jenis, metode, nominal, tanggal, created_at ),
+  pemberitahuan ( pemberitahuan_id, jenis, hasil, tindak_lanjut, catatan, dikirim_at, diperbarui_at )
 `;
 
 const urutWaktu = <T extends { created_at: string }>(baris: T[]) => [...baris].sort((a, b) => a.created_at.localeCompare(b.created_at));
@@ -35,6 +36,8 @@ export async function ambilDetailTiket(db: Klien, tiketId: string) {
     rincian_estimasi: urutWaktu(data.rincian_estimasi),
     // spare_part tidak punya created_at: urutkan menurut nama agar stabil.
     spare_part: [...data.spare_part].sort((a, b) => a.nama_komponen.localeCompare(b.nama_komponen, "id")),
+    // Pemberitahuan terbaru di atas.
+    pemberitahuan: [...data.pemberitahuan].sort((a, b) => b.dikirim_at.localeCompare(a.dikirim_at)),
   };
 }
 
