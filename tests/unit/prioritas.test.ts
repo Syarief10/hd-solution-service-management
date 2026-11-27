@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { alasanPrioritas, urutkanPrioritas, type TiketAntrean } from "@/lib/tiket/prioritas";
+import { AHP, alasanPrioritas, BOBOT, BOBOT_NOTEBOOK, hitungAhp, matriksAhp, nilaiKriteria, PERBANDINGAN, urutkanPrioritas, type TiketAntrean } from "@/lib/tiket/prioritas";
 
 // Tanggal acuan mockup: Rabu, 21 Oktober 2026 pukul 12.00 WIB.
 const HARI_INI = new Date("2026-10-21T05:00:00Z");
@@ -38,21 +38,16 @@ const MOCKUP: Contoh[] = [
 describe("urutan prioritas (mockup 02)", () => {
   const hasil = urutkanPrioritas(MOCKUP, HARI_INI);
 
-  it("urutannya sama persis dengan mockup 02", () => {
-    expect(hasil.map((t) => t.nomor)).toEqual([
-      "HD-2026-0003",
-      "HD-2026-0007",
-      "HD-2026-0012",
-      "HD-2026-0009",
-      "HD-2026-0011",
-      "HD-2026-0013",
-      "HD-2026-0014",
-      "HD-2026-0015",
-      "HD-2026-0016",
-      "HD-2026-0017",
-      "HD-2026-0018",
-    ]);
+  it("semua tiket aktif mendapat peringkat berurutan dan skor menurun", () => {
+    expect(hasil).toHaveLength(11);
     expect(hasil.map((t) => t.peringkat)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    hasil.slice(1).forEach((t, i) => expect(t.skor).toBeLessThanOrEqual(hasil[i].skor));
+  });
+
+  it("tiket terlambat paling lama ada di atas tiket antre biasa", () => {
+    const posisi = (n: string) => hasil.findIndex((t) => t.nomor === n);
+    expect(posisi("HD-2026-0003")).toBeLessThan(posisi("HD-2026-0017"));
+    expect(posisi("HD-2026-0003")).toBeLessThan(posisi("HD-2026-0013"));
   });
 
   it("tiket berstatus akhir tidak masuk antrean", () => {
@@ -97,8 +92,65 @@ describe("aturan alasan (aturan pertama yang cocok)", () => {
   });
 });
 
+describe("bobot AHP dari notebook (bobot-ahp.json)", () => {
+  it("konsisten (CR < 0,1) dan bobot berjumlah 1", () => {
+    expect(BOBOT_NOTEBOOK.cr).toBeLessThan(0.1);
+    expect(BOBOT.reduce((s, x) => s + x, 0)).toBeCloseTo(1, 3);
+  });
+
+  it("cocok dengan perhitungan ulang dari matriks yang sama", () => {
+    BOBOT.forEach((w, i) => expect(w).toBeCloseTo(AHP.bobot[i], 1));
+    expect(AHP.konsisten).toBe(true);
+    // Penilaian pemilik: kedekatan tenggat paling penting.
+    expect(Math.max(...BOBOT)).toBe(BOBOT[1]);
+  });
+
+  it("matriks berbalikan dengan diagonal 1", () => {
+    const m = matriksAhp(PERBANDINGAN);
+    m.forEach((baris, i) => {
+      expect(baris[i]).toBe(1);
+      baris.forEach((x, j) => expect(x * m[j][i]).toBeCloseTo(1));
+    });
+  });
+
+  it("matriks semua sama penting menghasilkan bobot rata dan CR 0", () => {
+    const h = hitungAhp(Array.from({ length: 5 }, () => [1, 1, 1, 1, 1]));
+    h.bobot.forEach((w) => expect(w).toBeCloseTo(0.2));
+    expect(h.cr).toBeCloseTo(0);
+  });
+
+  it("penilaian bertentangan terdeteksi tidak konsisten, perbandingan kosong ditolak", () => {
+    expect(hitungAhp(matriksAhp({ "A-B": 9, "B-C": 9, "A-C": 1 / 9 }, ["A", "B", "C"])).konsisten).toBe(false);
+    expect(() => matriksAhp({ "A-B": 2 }, ["A", "B", "C"])).toThrow(/belum diisi/);
+  });
+});
+
+describe("nilai kriteria dan skor SAW", () => {
+  it("terlambat mengisi C1, tenggat besok C2 = 1/2, siap diambil mengisi C5", () => {
+    expect(nilaiKriteria(tiket("x", "dikerjakan", "2026-10-10", "2026-10-17"), HARI_INI)).toMatchObject({ C1: 4, C2: 0 });
+    expect(nilaiKriteria(tiket("x", "dikerjakan", "2026-10-10", "2026-10-22"), HARI_INI).C2).toBeCloseTo(0.5);
+    const siap = nilaiKriteria(tiket("x", "siap_diambil", "2026-10-10", "2026-10-15", { siap_sejak: pukul9("2026-10-16") }), HARI_INI);
+    expect(siap).toMatchObject({ C1: 0, C2: 0, C5: 5 });
+  });
+
+  it("skor sama dengan perhitungan manual SAW", () => {
+    const w = [0.4, 0.3, 0.1, 0.1, 0.1];
+    const a = tiket("a", "dikerjakan", "2026-10-10", "2026-10-19", { estimasi_biaya: 100000, status_sejak: pukul9("2026-10-19") }); // C1=2, C3=2
+    const b = tiket("b", "dikerjakan", "2026-10-10", "2026-10-17", { estimasi_biaya: 400000, status_sejak: pukul9("2026-10-20") }); // C1=4, C3=1
+    const [pertama, kedua] = urutkanPrioritas([a, b], HARI_INI, w);
+    expect(pertama.nomor).toBe("b");
+    expect(pertama.skor).toBeCloseTo(0.4 + 0.1 * 0.5 + 0.1); // 0,55
+    expect(kedua.skor).toBeCloseTo(0.4 * 0.5 + 0.1 + 0.1 * 0.25); // 0,325
+  });
+
+  it("sesuai penilaian pemilik: tenggat besok didahulukan daripada terlambat 2 hari", () => {
+    const hasil = urutkanPrioritas([tiket("telat", "dikerjakan", "2026-10-10", "2026-10-19"), tiket("besok", "dikerjakan", "2026-10-10", "2026-10-22")], HARI_INI);
+    expect(hasil.map((t) => t.nomor)).toEqual(["besok", "telat"]);
+  });
+});
+
 describe("urutan kasus batas", () => {
-  it("keterlambatan sama diurutkan dari yang masuk lebih dulu", () => {
+  it("skor sama diurutkan dari yang masuk lebih dulu", () => {
     const hasil = urutkanPrioritas(
       [tiket("baru", "dikerjakan", "2026-10-12", "2026-10-18"), tiket("lama", "dikerjakan", "2026-10-05", "2026-10-18")],
       HARI_INI,
