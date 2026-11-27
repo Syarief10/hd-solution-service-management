@@ -1,5 +1,5 @@
 // 01 / 01m Dasbor Iterasi 1 (issue #22): kartu ringkasan, Prioritas Pengerjaan (6 teratas, #15),
-// Tiket per Status, Aktivitas Terbaru, serta kartu dan grafik pendapatan 7 hari (Iterasi 3). Garansi menyusul di Iterasi 2.
+// Tiket per Status, Aktivitas Terbaru, serta kartu dan grafik pendapatan 7 hari (Iterasi 3). Panel Garansi Akan Berakhir (Iterasi 2).
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
@@ -7,6 +7,7 @@ import { Suspense, type ReactNode } from "react";
 
 import { Badge, ButtonLink, Card, CardHeader, cx, EmptyState, Ikon, SkeletonTable, StatusBadge, type NamaIkon } from "@/components/ui";
 import { GrafikPendapatan } from "@/components/dashboard/GrafikPendapatan";
+import { GaransiAkanBerakhir } from "@/components/dashboard/GaransiAkanBerakhir";
 import { PemberitahuanGagal } from "@/components/dashboard/PemberitahuanGagal";
 import { kartuDasbor, labelWaktu, MAKS_AKTIVITAS, susunAktivitas, tiketPerStatus, type Aktivitas } from "@/lib/dasbor";
 import { bagianJakarta, formatRupiah, formatTanggal, formatTanggalPanjang, tanggalJakarta } from "@/lib/format";
@@ -291,6 +292,10 @@ async function IsiDasbor() {
               <AktivitasTerbaru />
             </Suspense>
           </Card>
+
+          <Suspense fallback={<SkeletonTable baris={2} kolom={2} label="Memuat garansi…" />}>
+            <GaransiAkanBerakhir />
+          </Suspense>
         </div>
       </div>
     </>
