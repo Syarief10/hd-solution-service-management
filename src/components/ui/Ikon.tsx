@@ -32,6 +32,7 @@ const PATH = {
   cash: "M2 6h20v12H2zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
   chevronRight: "M9 6l6 6-6 6",
   chevronLeft: "M15 6l-6 6 6 6",
+  chat: "M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12z",
 } as const;
 
 export type NamaIkon = keyof typeof PATH;
