@@ -17,12 +17,20 @@ async function masuk(page: Page, tujuan: string) {
   await expect(page).toHaveURL(new RegExp(tujuan.replace(/[?]/g, "\\?") + "$"));
 }
 
+/** Lewati tes jika tiket uji sudah ditutup (tidak ada tombol Perbarui Status). */
+async function pastikanAktif(page: Page) {
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  const ada = await page.getByRole("button", { name: "Perbarui Status" }).count();
+  test.skip(ada === 0, "Tiket E2E_TIKET_ID sudah ditutup; isi dengan tiket yang masih aktif");
+}
+
 test.describe("@login dialog Perbarui Status", () => {
   test.skip(!email || !sandi || !tiketId, "Butuh E2E_EMAIL, E2E_PASSWORD, dan E2E_TIKET_ID di .env.local");
 
   test("dialog terbuka, fokus di dalam, dan Esc menutupnya", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await masuk(page, `/tiket/${tiketId}`);
+    await pastikanAktif(page);
     await page.getByRole("button", { name: "Perbarui Status" }).first().click();
     const dialog = page.getByRole("dialog", { name: "Perbarui Status" });
     await expect(dialog).toBeVisible();
@@ -35,6 +43,7 @@ test.describe("@login dialog Perbarui Status", () => {
   test("Batalkan tiket mewajibkan alasan dan tidak menyimpan tanpa alasan", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await masuk(page, `/tiket/${tiketId}`);
+    await pastikanAktif(page);
     await page.getByRole("button", { name: "Perbarui Status" }).first().click();
     const dialog = page.getByRole("dialog");
     await dialog.getByRole("button", { name: "Batalkan tiket" }).click();
@@ -47,6 +56,7 @@ test.describe("@login dialog Perbarui Status", () => {
   test("di mobile tombol Perbarui Status selalu terlihat di bawah layar", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await masuk(page, `/tiket/${tiketId}`);
+    await pastikanAktif(page);
     const tombol = page.locator("[data-sembunyikan-nav]").getByRole("button", { name: "Perbarui Status" });
     await expect(tombol).toBeInViewport();
     await expect(page.locator("nav.fixed")).toBeHidden();
