@@ -1,17 +1,20 @@
 // 01 / 01m Dasbor Iterasi 1 (issue #22): kartu ringkasan, Prioritas Pengerjaan (6 teratas, #15),
-// Tiket per Status, dan Aktivitas Terbaru. Kartu Pendapatan, Grafik, dan Garansi menyusul di iterasinya.
+// Tiket per Status, Aktivitas Terbaru, serta kartu dan grafik pendapatan 7 hari (Iterasi 3). Garansi menyusul di Iterasi 2.
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense, type ReactNode } from "react";
 
 import { Badge, ButtonLink, Card, CardHeader, cx, EmptyState, Ikon, SkeletonTable, StatusBadge, type NamaIkon } from "@/components/ui";
+import { GrafikPendapatan } from "@/components/dashboard/GrafikPendapatan";
 import { kartuDasbor, labelWaktu, MAKS_AKTIVITAS, susunAktivitas, tiketPerStatus, type Aktivitas } from "@/lib/dasbor";
-import { bagianJakarta, formatTanggal, formatTanggalPanjang } from "@/lib/format";
+import { bagianJakarta, formatRupiah, formatTanggal, formatTanggalPanjang, tanggalJakarta } from "@/lib/format";
+import { ringkas, seriHarian, tambahHari } from "@/lib/rekap";
 import { createClient } from "@/lib/supabase/server";
 import { ambilTiketDaftar } from "@/lib/tiket/ambil-daftar";
 import { urutkanPrioritas } from "@/lib/tiket/prioritas";
 import { STATUS, STATUS_AKHIR, tampilanStatus } from "@/lib/tiket/status";
+import { ambilTransaksi } from "@/lib/transaksi";
 
 export const metadata: Metadata = { title: "Dasbor | HD Solution Computer" };
 
@@ -19,7 +22,7 @@ const BARIS_PRIORITAS = 6;
 const tgl = (w: string) => formatTanggal(w.length === 10 ? `${w}T12:00:00+07:00` : w);
 const tglPendek = (w: string) => tgl(w).replace(/ \d{4}$/, "");
 
-function Kartu({ judul, nilai, keterangan, ikon, bahaya = false, className }: { judul: string; nilai: number; keterangan: ReactNode; ikon: NamaIkon; bahaya?: boolean; className?: string }) {
+function Kartu({ judul, nilai, keterangan, ikon, bahaya = false, className }: { judul: string; nilai: ReactNode; keterangan: ReactNode; ikon: NamaIkon; bahaya?: boolean; className?: string }) {
   return (
     <Card className={cx("flex flex-col gap-1.5 p-4 md:p-5", bahaya && "border-red-300", className)}>
       <div className="flex items-start justify-between gap-2">
@@ -99,14 +102,18 @@ async function IsiDasbor() {
   await connection();
   const sekarang = new Date();
   const db = await createClient();
-  const tiket = await ambilTiketDaftar(db, { hanyaAktif: true, statusAkhir: STATUS_AKHIR });
+  const hari = tanggalJakarta(sekarang);
+  const dari7 = tambahHari(hari, -6);
+  const [tiket, transaksi7] = await Promise.all([ambilTiketDaftar(db, { hanyaAktif: true, statusAkhir: STATUS_AKHIR }), ambilTransaksi(db, dari7, hari)]);
+  const pendapatanHariIni = ringkas(transaksi7.filter((t) => t.tanggal === hari));
+  const seri7 = seriHarian(transaksi7, dari7, hari, sekarang);
   const k = kartuDasbor(tiket, sekarang);
   const antrean = urutkanPrioritas(tiket, sekarang).slice(0, BARIS_PRIORITAS);
   const perStatus = tiketPerStatus(tiket);
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kartu judul="Tiket Aktif" ikon="ticket" nilai={k.aktif} keterangan={`${k.masukHariIni} tiket masuk hari ini`} />
         <Kartu
           judul="Tiket Terlambat"
@@ -122,14 +129,42 @@ async function IsiDasbor() {
             </>
           }
         />
-        <Kartu judul="Siap Diambil" ikon="box" nilai={k.siapDiambil} keterangan="Pelanggan perlu dihubungi" className="col-span-2 lg:col-span-1" />
+        <Kartu judul="Siap Diambil" ikon="box" nilai={k.siapDiambil} keterangan="Pelanggan perlu dihubungi" />
+        <Kartu
+          judul="Pendapatan Hari Ini"
+          ikon="cash"
+          nilai={formatRupiah(pendapatanHariIni.total)}
+          keterangan={
+            <>
+              {pendapatanHariIni.jumlah} transaksi ·{" "}
+              <Link href="/rekap" className="font-semibold text-primary hover:underline">
+                Lihat rekap
+              </Link>
+            </>
+          }
+        />
       </div>
+
+      <Card>
+        <CardHeader
+          judul="Pendapatan 7 Hari Terakhir"
+          keterangan={`Total ${formatRupiah(ringkas(transaksi7).total)}`}
+          aksi={
+            <Link href="/rekap?periode=mingguan" className="text-[13px] font-semibold text-primary hover:underline">
+              Rekap lengkap
+            </Link>
+          }
+        />
+        <div className="px-5 pb-5">
+          <GrafikPendapatan seri={seri7} hariIni={hari} />
+        </div>
+      </Card>
 
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
         <Card>
           <CardHeader
             judul="Prioritas Pengerjaan"
-            keterangan="Terlambat lebih dulu (terlama di atas), lalu urut tanggal masuk paling awal"
+            keterangan="Diurutkan dengan skor AHP-SAW: tenggat, keterlambatan, status diam, nilai servis, dan lama menunggu diambil"
             aksi={
               <Link href="/tiket" className="text-[13px] font-semibold text-primary hover:underline">
                 Lihat semua antrean
