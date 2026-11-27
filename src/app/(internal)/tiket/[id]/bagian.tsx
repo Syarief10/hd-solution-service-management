@@ -11,6 +11,7 @@ import {
   TombolBukaUlang,
   TombolSalin,
 } from "./aksi-klien";
+import { PerbaruiStatus } from "./perbarui-status";
 import { Badge, ButtonLink, Card, cx, EmptyState, Ikon, StatusBadge } from "@/components/ui";
 import { formatNomorWa, formatRupiah, formatTanggal, formatTanggalWaktu } from "@/lib/format";
 import {
@@ -95,6 +96,16 @@ export function HeaderTiket({ t, sekarang }: { t: DetailTiket; sekarang: Date })
             </span>
           </div>
         </div>
+        {!tertutup && (
+          <PerbaruiStatus
+            tiketId={t.tiket_id}
+            nomorTiket={t.nomor_tiket}
+            status={t.status}
+            keputusan={t.keputusan}
+            biaya={Number(t.biaya)}
+            estimasi_biaya={t.estimasi_biaya === null ? null : Number(t.estimasi_biaya)}
+          />
+        )}
       </div>
 
       {tertutup && (
