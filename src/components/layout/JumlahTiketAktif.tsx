@@ -1,10 +1,8 @@
 import { connection } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
+import { STATUS_AKHIR } from "@/lib/tiket/status";
 
-// Status akhir menurut skema database (keputusan K1).
-// TODO(#9): ambil dari src/lib/tiket/status.ts setelah modul status tersedia.
-const STATUS_AKHIR = ["selesai", "dikembalikan", "dibatalkan"] as const;
 
 /** Jumlah tiket aktif di samping menu Tiket Servis. Hanya membaca data. */
 export async function JumlahTiketAktif() {
