@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 
 import { perbaruiStatus } from "./actions";
+import { TombolKirimWa } from "./pemberitahuan-klien";
+import { linkWa, pesanStatus, type DataPesan } from "@/lib/whatsapp";
 import { Button, cx, Ikon, StatusBadge, useToast } from "@/components/ui";
 import { formatRupiah } from "@/lib/format";
 import { butuhBiaya, catatanWajib, pilihanAwal, pilihanStatus, validasiIsianStatus, type IsianStatus, type TiketUntukStatus } from "@/lib/tiket/perbarui";
 import { infoWajib, STATUS, tampilanStatus, type KodeStatus } from "@/lib/tiket/status";
 
-type Props = TiketUntukStatus & { tiketId: string; nomorTiket: string };
+type Props = TiketUntukStatus & { tiketId: string; nomorTiket: string; wa: { nomorWa: string; data: DataPesan } };
 
 const KELAS_INPUT =
   "block min-h-11 w-full rounded-lg border border-slate-300 bg-surface px-3 text-sm text-ink placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25";
@@ -26,7 +28,10 @@ const angka = (teks: string) => {
  * Desktop: tombol di header. Mobile: bilah bawah yang selalu terlihat (issue #23).
  */
 export function PerbaruiStatus(props: Props) {
-  const { tiketId, nomorTiket, ...t } = props;
+  const { tiketId, nomorTiket, wa, ...t } = props;
+  const [kirimWa, setKirimWa] = useState(true);
+  /** Setelah status tersimpan dan "kirim pemberitahuan" dicentang: status tujuan untuk langkah kirim. */
+  const [langkahKirim, setLangkahKirim] = useState<KodeStatus | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const router = useRouter();
   const toast = useToast();
@@ -49,6 +54,7 @@ export function PerbaruiStatus(props: Props) {
   function buka() {
     setIsian(kosong());
     setKesalahan([]);
+    setLangkahKirim(null);
     dialog.current?.showModal();
   }
 
@@ -74,9 +80,16 @@ export function PerbaruiStatus(props: Props) {
         setKesalahan([hasil.pesan]);
         return;
       }
-      dialog.current?.close();
       toast({ judul: "Status diperbarui", keterangan: hasil.pesan ?? `${nomorTiket} → ${STATUS[ke as KodeStatus].label}` });
-      router.refresh();
+      // Langkah kedua: kirim pemberitahuan lewat tombol WhatsApp (klik pengguna, jadi tidak diblokir browser).
+      // Data halaman dimuat ulang saat dialog ditutup, supaya dialog tidak hilang lebih dulu
+      // pada status akhir (tombol Perbarui Status disembunyikan untuk tiket tertutup).
+      if (kirimWa && linkWa(wa.nomorWa, "x")) {
+        setLangkahKirim(ke as KodeStatus);
+      } else {
+        dialog.current?.close();
+        router.refresh();
+      }
     });
   }
 
@@ -100,12 +113,41 @@ export function PerbaruiStatus(props: Props) {
         onCancel={(e) => {
           if (menyimpan) e.preventDefault();
         }}
+        onClose={() => {
+          if (langkahKirim) router.refresh();
+        }}
         onClick={(e) => {
           // Klik di luar kotak dialog (backdrop) menutupnya.
           if (e.target === dialog.current) tutup();
         }}
         className="m-auto w-[min(560px,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] overflow-hidden rounded-card border border-border bg-surface p-0 text-ink shadow-[0_24px_48px_rgba(15,23,42,0.25)] backdrop:bg-slate-900/50"
       >
+        {langkahKirim ? (
+          <div className="flex max-h-[calc(100dvh-2rem)] flex-col">
+            <header className="border-b border-border px-5 py-4">
+              <h2 id="judul-perbarui" className="text-lg font-bold">
+                Kirim Pemberitahuan
+              </h2>
+              <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[13px] text-muted">
+                <Ikon nama="checkCircle" className="text-teal" /> Status {nomorTiket} sudah menjadi <StatusBadge tampilan={tampilanStatus(langkahKirim)} />
+              </p>
+            </header>
+            <div className="flex flex-col gap-3 overflow-y-auto px-5 py-4">
+              <div className="rounded-lg bg-[#ECE5DD] p-3">
+                <p aria-label="Pratinjau pesan" className="rounded-md bg-surface p-3 text-[13px] leading-relaxed break-words whitespace-pre-line shadow-sm">
+                  {pesanStatus(wa.data, langkahKirim)}
+                </p>
+              </div>
+              <p className="text-xs text-muted">WhatsApp akan terbuka dengan pesan ini. Setelah dikirim, tandai &quot;Sudah terkirim&quot; di panel Pemberitahuan.</p>
+            </div>
+            <footer className="flex flex-col-reverse gap-2 border-t border-border px-5 py-4 sm:flex-row sm:justify-end">
+              <Button varian="sekunder" onClick={() => dialog.current?.close()}>
+                Lewati
+              </Button>
+              <TombolKirimWa tiketId={tiketId} jenis={langkahKirim} nomorWa={wa.nomorWa} pesan={pesanStatus(wa.data, langkahKirim)} setelah={() => dialog.current?.close()} />
+            </footer>
+          </div>
+        ) : (
         <form
           method="dialog"
           noValidate
@@ -274,6 +316,13 @@ export function PerbaruiStatus(props: Props) {
               </p>
             )}
 
+            {ke && (
+              <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm">
+                <input type="checkbox" checked={kirimWa} onChange={(e) => setKirimWa(e.target.checked)} className="size-5 accent-primary" />
+                Kirim pemberitahuan WhatsApp ke pelanggan setelah disimpan
+              </label>
+            )}
+
             {kesalahan.length > 0 && (
               <ul role="alert" className="flex flex-col gap-1 rounded-lg border border-red-200 bg-danger-soft p-3 text-[13px] text-red-800">
                 {kesalahan.map((k) => (
@@ -304,6 +353,7 @@ export function PerbaruiStatus(props: Props) {
             </Button>
           </footer>
         </form>
+        )}
       </dialog>
     </>
   );

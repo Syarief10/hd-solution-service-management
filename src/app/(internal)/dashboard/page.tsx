@@ -7,6 +7,7 @@ import { Suspense, type ReactNode } from "react";
 
 import { Badge, ButtonLink, Card, CardHeader, cx, EmptyState, Ikon, SkeletonTable, StatusBadge, type NamaIkon } from "@/components/ui";
 import { GrafikPendapatan } from "@/components/dashboard/GrafikPendapatan";
+import { PemberitahuanGagal } from "@/components/dashboard/PemberitahuanGagal";
 import { kartuDasbor, labelWaktu, MAKS_AKTIVITAS, susunAktivitas, tiketPerStatus, type Aktivitas } from "@/lib/dasbor";
 import { bagianJakarta, formatRupiah, formatTanggal, formatTanggalPanjang, tanggalJakarta } from "@/lib/format";
 import { ringkas, seriHarian, tambahHari } from "@/lib/rekap";
@@ -283,6 +284,9 @@ async function IsiDasbor() {
 
           <Card>
             <CardHeader judul="Aktivitas Terbaru" />
+            <Suspense fallback={null}>
+              <PemberitahuanGagal />
+            </Suspense>
             <Suspense fallback={<SkeletonTable baris={4} kolom={2} label="Memuat aktivitas…" />}>
               <AktivitasTerbaru />
             </Suspense>

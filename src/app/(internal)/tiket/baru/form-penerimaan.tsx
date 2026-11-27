@@ -19,6 +19,7 @@ import {
 import { formatTanggalWaktu } from "@/lib/format";
 import type { TiketTersimpan } from "@/lib/penerimaan/simpan";
 import {
+  gabungMerkTipe,
   isianKosong,
   JENIS_PERANGKAT,
   KELENGKAPAN_BAWAAN,
@@ -158,7 +159,15 @@ export function FormPenerimaan() {
     window.scrollTo({ top: 0 });
   }
 
-  if (tersimpan) return <KartuBerhasil tiket={tersimpan} onBuatLagi={buatLagi} />;
+  if (tersimpan) {
+    return (
+      <KartuBerhasil
+        tiket={tersimpan}
+        pelanggan={{ nama: isian.nama, whatsapp: isian.whatsapp, perangkat: gabungMerkTipe(isian.merek, isian.model) || isian.jenis }}
+        onBuatLagi={buatLagi}
+      />
+    );
+  }
 
   const item = isian.kelengkapan;
   const diserahkan = item.filter((k) => k.diserahkan);

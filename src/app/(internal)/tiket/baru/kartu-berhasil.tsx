@@ -6,9 +6,20 @@ import { Badge, Button, ButtonLink, Card, Ikon } from "@/components/ui";
 import { formatTanggalWaktu } from "@/lib/format";
 import type { TiketTersimpan } from "@/lib/penerimaan/simpan";
 import { formatToken, pathStatus } from "@/lib/tiket/kode-akses";
+import { pesanTandaTerima } from "@/lib/whatsapp";
+import { TombolKirimWa } from "../[id]/pemberitahuan-klien";
 
 /** Layar berhasil setelah tiket disimpan (issue #12, mockup 03b). */
-export function KartuBerhasil({ tiket, onBuatLagi }: { tiket: TiketTersimpan; onBuatLagi: () => void }) {
+export function KartuBerhasil({
+  tiket,
+  pelanggan,
+  onBuatLagi,
+}: {
+  tiket: TiketTersimpan;
+  /** Untuk pesan Kirim Bukti via WhatsApp (diambil dari isian form). */
+  pelanggan: { nama: string; whatsapp: string; perangkat: string };
+  onBuatLagi: () => void;
+}) {
   const judul = useRef<HTMLHeadingElement>(null);
   // Kartu ini hanya dirender di klien (setelah simpan), jadi window selalu tersedia.
   const [asal] = useState(() => (typeof window === "undefined" ? "" : window.location.origin));
@@ -84,6 +95,15 @@ export function KartuBerhasil({ tiket, onBuatLagi }: { tiket: TiketTersimpan; on
       )}
 
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        {asal && (
+          <TombolKirimWa
+            tiketId={tiket.tiketId}
+            jenis="tanda_terima"
+            nomorWa={pelanggan.whatsapp}
+            pesan={pesanTandaTerima({ nama: pelanggan.nama, nomorTiket: tiket.nomorTiket, perangkat: pelanggan.perangkat, link })}
+            label="Kirim Bukti via WhatsApp"
+          />
+        )}
         <ButtonLink href={`/tiket/${tiket.tiketId}/tanda-terima`} ikon="ticket">
           Cetak Tanda Terima
         </ButtonLink>

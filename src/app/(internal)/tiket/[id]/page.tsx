@@ -7,6 +7,9 @@ import { Suspense } from "react";
 
 import { HeaderTiket, TabEstimasi, TabInformasi, TabKomponen, TabProgres, TabTransaksi } from "./bagian";
 import { NavTab } from "./nav-tab";
+import { PanelPemberitahuan } from "./pemberitahuan-klien";
+import { susunPesanTiket } from "@/lib/tiket/pesan";
+import { isAktif } from "@/lib/tiket/status";
 import { SkeletonTable } from "@/components/ui";
 import { alamatAplikasi } from "@/lib/alamat";
 import { ambilDetailTiket, tabAktif } from "@/lib/tiket/detail";
@@ -26,6 +29,9 @@ async function IsiDetail({ params, searchParams }: Props) {
 
   const aktif = tabAktif(tab);
   const sekarang = new Date();
+  const alamat = await alamatAplikasi();
+  const wa = susunPesanTiket(t, alamat);
+  const tiketAktif = isAktif(t.status);
 
   return (
     <>
@@ -38,15 +44,28 @@ async function IsiDetail({ params, searchParams }: Props) {
         </span>
         <span className="tabular-nums">{t.nomor_tiket}</span>
       </nav>
-      <HeaderTiket t={t} sekarang={sekarang} />
-      <NavTab tiketId={t.tiket_id} aktif={aktif} />
-      <section aria-label="Isi tab">
-        {aktif === "informasi" && <TabInformasi t={t} alamat={await alamatAplikasi()} />}
-        {aktif === "progres" && <TabProgres t={t} />}
-        {aktif === "estimasi" && <TabEstimasi t={t} />}
-        {aktif === "komponen" && <TabKomponen t={t} sekarang={sekarang} />}
-        {aktif === "transaksi" && <TabTransaksi t={t} />}
-      </section>
+      <HeaderTiket t={t} sekarang={sekarang} wa={{ nomorWa: wa.nomorWa, data: wa.data }} />
+      <div className="grid items-start gap-4 md:gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="flex min-w-0 flex-col gap-4 md:gap-5">
+          <NavTab tiketId={t.tiket_id} aktif={aktif} />
+          <section aria-label="Isi tab">
+            {aktif === "informasi" && <TabInformasi t={t} alamat={alamat} />}
+            {aktif === "progres" && <TabProgres t={t} />}
+            {aktif === "estimasi" && <TabEstimasi t={t} wa={{ nomorWa: wa.nomorWa, pesan: wa.perJenis.estimasi ?? null }} />}
+            {aktif === "komponen" && <TabKomponen t={t} sekarang={sekarang} />}
+            {aktif === "transaksi" && <TabTransaksi t={t} />}
+          </section>
+        </div>
+        <PanelPemberitahuan
+          tiketId={t.tiket_id}
+          nomorWa={wa.nomorWa}
+          jenis={wa.jenis}
+          pesan={wa.pesan}
+          pesanPerJenis={wa.perJenis}
+          riwayat={t.pemberitahuan}
+          bisaKirim={tiketAktif}
+        />
+      </div>
     </>
   );
 }
