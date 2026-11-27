@@ -1,6 +1,6 @@
 // Tipe database hasil generate dari Supabase (proyek hd-solution-service).
 // Jangan diedit manual. Generate ulang setelah setiap migration.
-// Terakhir: 25 November 2026, setelah 20261125030000_default_kolom_otomatis_tiket.
+// Terakhir: 27 November 2026, setelah 20261127040000_komponen_dan_portal.
 
 export type Json =
   | string
@@ -18,6 +18,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      catatan_pengerjaan: {
+        Row: {
+          catatan_id: string
+          created_at: string
+          isi: string
+          tiket_id: string
+        }
+        Insert: {
+          catatan_id?: string
+          created_at?: string
+          isi: string
+          tiket_id: string
+        }
+        Update: {
+          catatan_id?: string
+          created_at?: string
+          isi?: string
+          tiket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catatan_pengerjaan_tiket_id_fkey"
+            columns: ["tiket_id"]
+            isOneToOne: false
+            referencedRelation: "tiket"
+            referencedColumns: ["tiket_id"]
+          },
+          {
+            foreignKeyName: "catatan_pengerjaan_tiket_id_fkey"
+            columns: ["tiket_id"]
+            isOneToOne: false
+            referencedRelation: "v_antrean_prioritas"
+            referencedColumns: ["tiket_id"]
+          },
+        ]
+      }
       foto_perangkat: {
         Row: {
           foto_id: string
@@ -212,6 +248,48 @@ export type Database = {
           },
         ]
       }
+      rincian_estimasi: {
+        Row: {
+          biaya: number
+          created_at: string
+          jenis: string
+          rincian_id: string
+          tiket_id: string
+          uraian: string
+        }
+        Insert: {
+          biaya: number
+          created_at?: string
+          jenis: string
+          rincian_id?: string
+          tiket_id: string
+          uraian: string
+        }
+        Update: {
+          biaya?: number
+          created_at?: string
+          jenis?: string
+          rincian_id?: string
+          tiket_id?: string
+          uraian?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rincian_estimasi_tiket_id_fkey"
+            columns: ["tiket_id"]
+            isOneToOne: false
+            referencedRelation: "tiket"
+            referencedColumns: ["tiket_id"]
+          },
+          {
+            foreignKeyName: "rincian_estimasi_tiket_id_fkey"
+            columns: ["tiket_id"]
+            isOneToOne: false
+            referencedRelation: "v_antrean_prioritas"
+            referencedColumns: ["tiket_id"]
+          },
+        ]
+      }
       riwayat_status: {
         Row: {
           catatan_teknis: string | null
@@ -260,6 +338,8 @@ export type Database = {
           sparepart_id: string
           status_pengadaan: string
           tanggal_pasang: string | null
+          tanggal_pesan: string | null
+          tanggal_tiba: string | null
           tiket_id: string
         }
         Insert: {
@@ -270,6 +350,8 @@ export type Database = {
           sparepart_id?: string
           status_pengadaan?: string
           tanggal_pasang?: string | null
+          tanggal_pesan?: string | null
+          tanggal_tiba?: string | null
           tiket_id: string
         }
         Update: {
@@ -280,6 +362,8 @@ export type Database = {
           sparepart_id?: string
           status_pengadaan?: string
           tanggal_pasang?: string | null
+          tanggal_pesan?: string | null
+          tanggal_tiba?: string | null
           tiket_id?: string
         }
         Relationships: [
@@ -312,7 +396,9 @@ export type Database = {
           keputusan_alasan: string | null
           keputusan_at: string | null
           keputusan_cara: string | null
+          kondisi_fisik: string | null
           nomor_tiket: string
+          pakai_komponen: boolean | null
           perangkat_id: string
           pin_pengambilan: string
           status: string
@@ -333,7 +419,9 @@ export type Database = {
           keputusan_alasan?: string | null
           keputusan_at?: string | null
           keputusan_cara?: string | null
+          kondisi_fisik?: string | null
           nomor_tiket?: string
+          pakai_komponen?: boolean | null
           perangkat_id: string
           pin_pengambilan?: string
           status?: string
@@ -354,7 +442,9 @@ export type Database = {
           keputusan_alasan?: string | null
           keputusan_at?: string | null
           keputusan_cara?: string | null
+          kondisi_fisik?: string | null
           nomor_tiket?: string
+          pakai_komponen?: boolean | null
           perangkat_id?: string
           pin_pengambilan?: string
           status?: string
@@ -581,6 +671,19 @@ export type Database = {
       }
       samarkan_nama: { Args: { p_nama: string }; Returns: string }
       sensor_whatsapp: { Args: { p_no: string }; Returns: string }
+      simpan_penerimaan: {
+        Args: {
+          p_kategori: string
+          p_kelengkapan?: string[]
+          p_keluhan: string
+          p_kondisi_fisik: string
+          p_merk_tipe: string
+          p_nama: string
+          p_serial: string
+          p_whatsapp: string
+        }
+        Returns: Json
+      }
       transisi_status_diizinkan: {
         Args: { p_dari: string; p_ke: string }
         Returns: boolean
