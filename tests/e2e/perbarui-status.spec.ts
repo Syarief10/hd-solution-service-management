@@ -2,7 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 
 // Dialog Perbarui Status (issue #18) dan alur utama Iterasi 1 (issue #24).
 // - @login: membuka dialog di tiket uji (E2E_TIKET_ID), tidak menyimpan.
-// - @tulis: alur lengkap yang menyimpan tiket baru sampai ditutup. Hanya dengan E2E_BOLEH_TULIS=1,
+// - @tulis: dua alur yang menyimpan tiket baru sampai berakhir (dibayar lalu ditutup, atau estimasi
+//   ditolak lalu dikembalikan). Hanya dengan E2E_BOLEH_TULIS=1,
 //   sebaiknya ke proyek Supabase uji, karena membuat tiket dan transaksi sungguhan.
 
 const email = process.env.E2E_EMAIL;
@@ -77,16 +78,16 @@ test.describe("@tulis alur utama Iterasi 1", () => {
     await expect(page.getByRole("heading", { level: 1 }).locator("..")).toContainText(ke);
   }
 
-  test("terima → diagnosis → estimasi disetujui → dikerjakan → pengujian → siap diambil → bayar dan tutup", async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
+  /** Buat tiket baru lewat Form Penerimaan, buka detailnya, lalu isi diagnosis dan estimasi. */
+  async function siapkanTiketDenganEstimasi(page: Page, nama: string) {
     await masuk(page, "/tiket/baru");
-    await page.getByLabel("Nama pelanggan").fill("Uji E2E Alur Utama");
+    await page.getByLabel("Nama pelanggan").fill(nama);
     await page.getByLabel("Nomor WhatsApp").fill("0899-0000-2222");
     await page.getByLabel("Laptop").check();
     await page.getByLabel("Merek").fill("Asus");
     await page.getByRole("textbox", { name: /^Model/ }).fill("VivoBook Uji E2E");
     await page.getByLabel("Nomor seri / identitas unit").fill(`SN E2E-${Date.now()}`);
-    await page.getByLabel("Keluhan").fill("Tes otomatis alur utama: tidak menyala.");
+    await page.getByLabel("Keluhan").fill(`Tes otomatis (${nama}): tidak menyala.`);
     await page.getByLabel("Kondisi fisik awal").fill("Tes otomatis.");
     await page.getByRole("checkbox", { name: "Charger" }).check();
     await page.getByLabel("Data unit dan kelengkapan sudah ditinjau bersama pelanggan.").check();
@@ -100,6 +101,11 @@ test.describe("@tulis alur utama Iterasi 1", () => {
     await page.locator('a[href$="?tab=estimasi"]').click();
     await page.getByLabel("Total estimasi biaya").fill("150000");
     await page.getByRole("button", { name: "Simpan Estimasi" }).click();
+  }
+
+  test("terima → diagnosis → estimasi disetujui → dikerjakan → pengujian → siap diambil → bayar dan tutup", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await siapkanTiketDenganEstimasi(page, "Uji E2E Alur Utama");
     await page.getByRole("button", { name: "Catat Disetujui" }).click();
     await expect(page.getByText("Disetujui", { exact: true })).toBeVisible();
 
@@ -118,5 +124,35 @@ test.describe("@tulis alur utama Iterasi 1", () => {
     await expect(page.getByText("Pembayaran tercatat")).toBeVisible();
     await expect(page.getByText("Ditutup", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Perbarui Status" })).toHaveCount(0);
+  });
+
+  test("estimasi ditolak → siap diambil tanpa perbaikan → dikembalikan", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await siapkanTiketDenganEstimasi(page, "Uji E2E Alur Ditolak");
+
+    // Penolakan wajib beralasan.
+    await page.getByRole("button", { name: "Catat Ditolak" }).click();
+    await page.getByRole("button", { name: "Simpan Penolakan" }).click();
+    await expect(page.getByText("Alasan penolakan wajib diisi.")).toBeVisible();
+    await page.getByLabel("Alasan penolakan").fill("Tes otomatis: biaya di atas anggaran pelanggan.");
+    await page.getByRole("button", { name: "Simpan Penolakan" }).click();
+    await expect(page.getByText("Ditolak", { exact: true })).toBeVisible();
+
+    // Setelah ditolak, perbaikan terkunci dan Siap Diambil tidak meminta biaya.
+    await page.getByRole("button", { name: "Perbarui Status" }).first().click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("radio", { name: /^Dikerjakan/ })).toBeDisabled();
+    await dialog.getByRole("radio", { name: /^Siap Diambil/ }).check();
+    await expect(dialog.getByLabel("Total biaya akhir")).toHaveCount(0);
+    await dialog.getByRole("button", { name: "Batal", exact: true }).click();
+
+    await ubahStatus(page, "Siap Diambil", async (d) => {
+      await d.getByLabel("Catatan").fill("Tes otomatis: unit dikembalikan tanpa perbaikan.");
+    });
+    await ubahStatus(page, "Dikembalikan");
+
+    await expect(page.getByRole("button", { name: "Perbarui Status" })).toHaveCount(0);
+    await page.locator('a[href$="?tab=transaksi"]').click();
+    await expect(page.getByRole("button", { name: "Terima Pembayaran & Tutup Tiket" })).toHaveCount(0);
   });
 });
