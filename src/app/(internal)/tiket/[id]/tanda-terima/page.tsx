@@ -1,6 +1,5 @@
 // Tanda terima siap cetak (FR-PNR-11, issue #12). Data dibaca dari database, jadi bisa dicetak ulang.
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import QRCode from "qrcode";
@@ -10,20 +9,12 @@ import { TombolCetak } from "./tombol-cetak";
 import { ButtonLink, SkeletonTable } from "@/components/ui";
 import { formatNomorWa, formatTanggalWaktu } from "@/lib/format";
 import { formatToken, pathStatus } from "@/lib/tiket/kode-akses";
+import { alamatAplikasi } from "@/lib/alamat";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Tanda Terima | HD Solution Computer" };
 
 const POLA_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/** Alamat aplikasi untuk link status di tanda terima. */
-async function alamatAplikasi() {
-  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  return `${proto}://${host}`;
-}
 
 async function IsiTandaTerima({ params }: { params: Promise<{ id: string }> }) {
   // Klien Supabase memakai Date.now() untuk sesi; tandai sebagai data per permintaan.
