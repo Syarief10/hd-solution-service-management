@@ -2,6 +2,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isAktif, TAHAP_LINTASAN, tahapDariStatus, type TahapLintasan } from "./status";
+import { BUCKET_FOTO, MASA_URL_DETIK } from "@/lib/foto";
 import type { Database } from "@/types/database";
 
 type Klien = SupabaseClient<Database>;
@@ -19,7 +20,8 @@ const KOLOM = `
   rincian_estimasi ( rincian_id, jenis, uraian, biaya, created_at ),
   spare_part ( sparepart_id, nama_komponen, status_pengadaan, biaya, lama_garansi_hari, tanggal_pesan, estimasi_tiba, tanggal_tiba, tanggal_pasang ),
   transaksi ( transaksi_id, jenis, metode, nominal, tanggal, created_at ),
-  pemberitahuan ( pemberitahuan_id, jenis, hasil, tindak_lanjut, catatan, dikirim_at, diperbarui_at )
+  pemberitahuan ( pemberitahuan_id, jenis, hasil, tindak_lanjut, catatan, dikirim_at, diperbarui_at ),
+  foto_perangkat ( foto_id, storage_path )
 `;
 
 const urutWaktu = <T extends { created_at: string }>(baris: T[]) => [...baris].sort((a, b) => a.created_at.localeCompare(b.created_at));
@@ -42,6 +44,17 @@ export async function ambilDetailTiket(db: Klien, tiketId: string) {
 }
 
 export type DetailTiket = NonNullable<Awaited<ReturnType<typeof ambilDetailTiket>>>;
+
+/** Signed URL sementara untuk foto kondisi (bucket privat). Foto yang gagal dibuatkan URL tetap tampil sebagai kotak kosong. */
+export async function urlFotoTiket(db: Klien, foto: { foto_id: string; storage_path: string }[]): Promise<{ foto_id: string; url: string | null }[]> {
+  if (foto.length === 0) return [];
+  const urut = [...foto].sort((a, b) => a.storage_path.localeCompare(b.storage_path));
+  const { data } = await db.storage.from(BUCKET_FOTO).createSignedUrls(
+    urut.map((f) => f.storage_path),
+    MASA_URL_DETIK,
+  );
+  return urut.map((f) => ({ foto_id: f.foto_id, url: data?.find((d) => d.path === f.storage_path)?.signedUrl ?? null }));
+}
 
 /** Waktu perubahan terakhir menurut riwayat (atau waktu diterima). */
 export function pembaruanTerakhir(t: Pick<DetailTiket, "riwayat_status" | "created_at">): string {

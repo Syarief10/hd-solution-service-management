@@ -9,6 +9,7 @@ import { skemaCatatan, skemaRincian, type IsianRincian } from "@/lib/tiket/estim
 import { barisKomponen, skemaKomponen, validasiKomponen, type IsianKomponen } from "@/lib/tiket/komponen";
 import { tanggalJakarta } from "@/lib/format";
 import { TINDAK_LANJUT } from "@/lib/whatsapp";
+import { BUCKET_FOTO, MAKS_FOTO, pathValid } from "@/lib/foto";
 import { butuhBiaya, susunCatatan, validasiIsianStatus, type IsianStatus } from "@/lib/tiket/perbarui";
 import { DAFTAR_STATUS, isAktif } from "@/lib/tiket/status";
 import { createClient } from "@/lib/supabase/server";
@@ -432,6 +433,49 @@ export async function catatTindakLanjut(tiketId: string, pemberitahuanId: string
     return { ok: false, pesan: pesanDatabase(error) };
   }
   return { ok: true, pesan: "Tindak lanjut tercatat" };
+}
+
+// ---------------------------------------------------------------------------
+// Foto kondisi perangkat (Iterasi 2, K9)
+// ---------------------------------------------------------------------------
+
+/**
+ * Catat foto yang sudah diunggah browser ke bucket privat. Path harus milik tiket ini,
+ * dan jumlah foto tidak boleh lebih dari MAKS_FOTO.
+ */
+export async function catatFoto(tiketId: string, path: string): Promise<HasilAksi> {
+  if (!POLA_UUID.test(tiketId) || !pathValid(tiketId, path)) return { ok: false, pesan: "Foto tidak valid." };
+  const s = await siapkan(tiketId);
+  if ("gagal" in s) return { ok: false, pesan: s.gagal! };
+  const jumlah = await s.db.from("foto_perangkat").select("foto_id", { count: "exact", head: true }).eq("tiket_id", tiketId);
+  if (jumlah.error) {
+    catat("hitung foto", jumlah.error);
+    return { ok: false, pesan: GAGAL_UMUM };
+  }
+  if ((jumlah.count ?? 0) >= MAKS_FOTO) return { ok: false, pesan: `Maksimal ${MAKS_FOTO} foto per tiket.` };
+  const { error } = await s.db.from("foto_perangkat").insert({ tiket_id: tiketId, storage_path: path });
+  if (error) {
+    catat("catat foto", error);
+    return { ok: false, pesan: pesanDatabase(error) };
+  }
+  return { ok: true };
+}
+
+export async function hapusFoto(tiketId: string, fotoId: string): Promise<HasilAksi> {
+  if (!POLA_UUID.test(fotoId)) return { ok: false, pesan: "Foto tidak ditemukan." };
+  const s = await siapkan(tiketId);
+  if ("gagal" in s) return { ok: false, pesan: s.gagal! };
+  const { data, error } = await s.db.from("foto_perangkat").delete().eq("foto_id", fotoId).eq("tiket_id", tiketId).select("storage_path").maybeSingle();
+  if (error) {
+    catat("hapus foto", error);
+    return { ok: false, pesan: pesanDatabase(error) };
+  }
+  if (data?.storage_path) {
+    const hapus = await s.db.storage.from(BUCKET_FOTO).remove([data.storage_path]);
+    // Baris sudah terhapus; berkas yang tertinggal tidak tampil di mana pun, cukup dicatat.
+    if (hapus.error) console.error(`[detail-tiket] hapus berkas foto gagal: ${hapus.error.message}`);
+  }
+  return { ok: true, pesan: "Foto dihapus" };
 }
 
 // ---------------------------------------------------------------------------
