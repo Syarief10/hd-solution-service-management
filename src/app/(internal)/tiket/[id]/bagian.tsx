@@ -14,8 +14,9 @@ import {
   TombolHapusRincian,
   TombolSalin,
 } from "./aksi-klien";
+import { AksiKomponen, PilihanPakaiKomponen, TambahKomponen } from "./komponen-klien";
 import { PerbaruiStatus } from "./perbarui-status";
-import { Badge, ButtonLink, Card, cx, EmptyState, Ikon, StatusBadge } from "@/components/ui";
+import { Badge, ButtonLink, Card, cx, Ikon, StatusBadge } from "@/components/ui";
 import { formatNomorWa, formatRupiah, formatTanggal, formatTanggalWaktu } from "@/lib/format";
 import {
   nomorTahap,
@@ -26,6 +27,7 @@ import {
 } from "@/lib/tiket/detail";
 import { LABEL_JENIS_RINCIAN, type JenisRincian } from "@/lib/tiket/estimasi";
 import { formatToken, pathStatus } from "@/lib/tiket/kode-akses";
+import { hitungGaransi, isianDariBaris, labelLamaGaransi, tampilanPengadaan, type Garansi } from "@/lib/tiket/komponen";
 import { isAktif, menungguPersetujuan, STATUS, tampilanStatus } from "@/lib/tiket/status";
 import { hariTerlambat, jatuhTempoBesok } from "@/lib/tiket/terlambat";
 
@@ -408,10 +410,100 @@ export function TabEstimasi({ t }: { t: DetailTiket }) {
 // Tab Komponen & Garansi (Iterasi 2)
 // ---------------------------------------------------------------------------
 
-export function TabKomponen() {
+const NADA_GARANSI = { aktif: "sukses", akan_berakhir: "peringatan", berakhir: "netral" } as const;
+
+function TeksGaransi({ g, lama }: { g: Garansi; lama: number }) {
+  if (g.status === "tanpa_garansi") return <>Tanpa garansi</>;
+  if (g.status === "tidak_berlaku") return <>Tidak berlaku (unit tidak diperbaiki)</>;
+  if (g.status === "belum_dimulai") return <>{lama} hari setelah penyerahan</>;
   return (
-    <Card>
-      <EmptyState varian="tanpa-hasil" ikon="shield" judul="Segera hadir" keterangan="Pencatatan komponen pengganti dan masa garansinya tersedia di Iterasi 2." />
+    <span className="flex flex-col items-start gap-1">
+      <span className="tabular-nums">{formatTanggal(g.berakhir!)}</span>
+      <Badge nada={NADA_GARANSI[g.status]}>
+        {g.status === "berakhir" ? `Berakhir ${Math.abs(g.sisaHari!)} hari lalu` : g.status === "akan_berakhir" ? `Akan berakhir · sisa ${g.sisaHari} hari` : `Aktif · sisa ${g.sisaHari} hari`}
+      </Badge>
+    </span>
+  );
+}
+
+function keteranganPengadaan(k: DetailTiket["spare_part"][number]): string | null {
+  const bagian: string[] = [];
+  if (k.tanggal_pesan) bagian.push(`Dipesan ${formatTanggal(k.tanggal_pesan)}`);
+  if (k.tanggal_tiba) bagian.push(`tiba ${formatTanggal(k.tanggal_tiba)}`);
+  else if (k.estimasi_tiba) bagian.push(`perkiraan tiba ${formatTanggal(k.estimasi_tiba)}`);
+  return bagian.length ? bagian.join(" · ") : null;
+}
+
+export function TabKomponen({ t, sekarang }: { t: DetailTiket; sekarang: Date }) {
+  const aktif = isAktif(t.status);
+  const komponen = t.spare_part;
+  const tanpa = t.pakai_komponen === false;
+
+  return (
+    <Card className="flex flex-col gap-4 p-4 md:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <JudulBagian>Komponen Pengganti</JudulBagian>
+        {aktif && <PilihanPakaiKomponen tiketId={t.tiket_id} pakai={t.pakai_komponen} jumlahKomponen={komponen.length} />}
+      </div>
+
+      {komponen.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-slate-300 px-4 py-8 text-center">
+          <Ikon nama="box" className="size-6 text-slate-500" />
+          <p className="text-sm font-semibold text-ink">{tanpa ? "Tidak menggunakan komponen pengganti" : aktif ? "Belum ada komponen tercatat" : "Tidak ada komponen pengganti"}</p>
+          <p className="max-w-md text-[13px] text-muted">
+            {tanpa
+              ? "Servis ini hanya berupa jasa. Tidak ada garansi komponen yang tercatat untuk tiket ini."
+              : aktif
+                ? "Catat komponen yang diganti beserta lama garansinya, atau pilih Tanpa komponen jika servis hanya berupa jasa."
+                : "Tidak ada komponen yang dicatat untuk tiket ini."}
+          </p>
+          {aktif && !tanpa && <TambahKomponen tiketId={t.tiket_id} />}
+        </div>
+      ) : (
+        <ul aria-label="Daftar komponen" className="flex flex-col gap-3">
+          {komponen.map((k) => {
+            const g = hitungGaransi(k.lama_garansi_hari, t, sekarang);
+            const pengadaan = tampilanPengadaan(k);
+            const ket = keteranganPengadaan(k);
+            return (
+              <li key={k.sparepart_id} className="flex flex-col gap-3 rounded-lg border border-border p-3.5">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="flex min-w-0 flex-col">
+                    <span className="font-semibold break-words text-ink">{k.nama_komponen}</span>
+                    <span className="text-xs text-muted">{k.lama_garansi_hari > 0 ? `Garansi ${labelLamaGaransi(k.lama_garansi_hari)}` : "Tanpa garansi"}</span>
+                  </div>
+                  {aktif && <AksiKomponen tiketId={t.tiket_id} komponenId={k.sparepart_id} nama={k.nama_komponen} awal={isianDariBaris(k)} />}
+                </div>
+                <dl className="grid grid-cols-[110px_minmax(0,1fr)] gap-x-3 gap-y-2 text-[13px] md:grid-cols-5 md:gap-y-1">
+                  <dt className="text-muted md:order-1">Pengadaan</dt>
+                  <dd className="flex flex-col items-start gap-1 md:order-6">
+                    <Badge nada={pengadaan.nada}>{pengadaan.label}</Badge>
+                    {ket && <span className="text-xs text-muted">{ket}</span>}
+                  </dd>
+                  <dt className="text-muted md:order-2">Biaya</dt>
+                  <dd className="tabular-nums md:order-7">{k.biaya === null ? "—" : formatRupiah(k.biaya)}</dd>
+                  <dt className="text-muted md:order-3">Dipasang</dt>
+                  <dd className="tabular-nums md:order-8">{k.tanggal_pasang ? formatTanggal(k.tanggal_pasang) : "—"}</dd>
+                  <dt className="text-muted md:order-4">Awal garansi</dt>
+                  <dd className="md:order-9">{g.mulai ? <span className="tabular-nums">{formatTanggal(g.mulai)}</span> : g.status === "belum_dimulai" ? "Saat unit diserahkan" : "—"}</dd>
+                  <dt className="text-muted md:order-5">Akhir garansi</dt>
+                  <dd className="md:order-10">
+                    <TeksGaransi g={g} lama={k.lama_garansi_hari} />
+                  </dd>
+                </dl>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {komponen.some((k) => k.lama_garansi_hari > 0) && (
+        <p className="rounded-lg bg-slate-50 p-3 text-[13px] text-slate-700">
+          Keterangan garansi: berlaku untuk kerusakan komponen yang sama. Tidak berlaku untuk kerusakan akibat cairan, jatuh, atau segel rusak.
+        </p>
+      )}
+
+      {aktif && komponen.length > 0 && <TambahKomponen tiketId={t.tiket_id} />}
     </Card>
   );
 }

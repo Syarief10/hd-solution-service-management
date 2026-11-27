@@ -6,6 +6,8 @@ import { z } from "zod";
 
 import { POLA_UUID } from "@/lib/tiket/detail";
 import { skemaCatatan, skemaRincian, type IsianRincian } from "@/lib/tiket/estimasi";
+import { barisKomponen, skemaKomponen, validasiKomponen, type IsianKomponen } from "@/lib/tiket/komponen";
+import { tanggalJakarta } from "@/lib/format";
 import { butuhBiaya, susunCatatan, validasiIsianStatus, type IsianStatus } from "@/lib/tiket/perbarui";
 import { DAFTAR_STATUS, isAktif } from "@/lib/tiket/status";
 import { createClient } from "@/lib/supabase/server";
@@ -27,7 +29,7 @@ async function siapkan(tiketId: string) {
   if (!sesi?.claims) return { gagal: "Sesi login berakhir. Silakan masuk lagi." } as const;
   const { data: t, error } = await db
     .from("tiket")
-    .select("status, keputusan, estimasi_biaya, biaya")
+    .select("status, keputusan, estimasi_biaya, biaya, pakai_komponen")
     .eq("tiket_id", tiketId)
     .maybeSingle();
   if (error) return { gagal: GAGAL_UMUM } as const;
@@ -193,6 +195,60 @@ export async function bukaUlangKeputusan(tiketId: string): Promise<HasilAksi> {
 }
 
 // ---------------------------------------------------------------------------
+// Komponen & Garansi (Iterasi 2, FR-GAR-01)
+// ---------------------------------------------------------------------------
+
+/** Pilihan Ada komponen / Tanpa komponen (`tiket.pakai_komponen`). */
+export async function pilihPakaiKomponen(tiketId: string, pakai: boolean): Promise<HasilAksi> {
+  const s = await siapkan(tiketId);
+  if ("gagal" in s) return { ok: false, pesan: s.gagal! };
+  const { error } = await s.db.from("tiket").update({ pakai_komponen: pakai }).eq("tiket_id", tiketId);
+  if (error) {
+    catat("pilih pakai komponen", error);
+    return { ok: false, pesan: pesanDatabase(error) };
+  }
+  return { ok: true, pesan: pakai ? "Ditandai ada komponen pengganti" : "Ditandai tanpa komponen" };
+}
+
+/** Tambah komponen (komponenId null) atau ubah komponen yang sudah ada. */
+export async function simpanKomponen(tiketId: string, komponenId: string | null, isian: IsianKomponen): Promise<HasilAksi> {
+  if (komponenId !== null && !POLA_UUID.test(komponenId)) return { ok: false, pesan: "Komponen tidak ditemukan." };
+  const isi = skemaKomponen.safeParse(isian);
+  if (!isi.success) return { ok: false, pesan: isi.error.issues[0].message };
+  const kesalahan = validasiKomponen(isi.data, tanggalJakarta(new Date()));
+  if (kesalahan.length) return { ok: false, pesan: kesalahan[0] };
+
+  const s = await siapkan(tiketId);
+  if ("gagal" in s) return { ok: false, pesan: s.gagal! };
+  if (s.t.pakai_komponen === false) return { ok: false, pesan: "Tiket ditandai Tanpa komponen. Pilih Ada komponen dulu." };
+
+  const baris = barisKomponen(isi.data);
+  const { error } =
+    komponenId === null
+      ? await s.db.from("spare_part").insert({ tiket_id: tiketId, ...baris })
+      : await s.db.from("spare_part").update(baris).eq("sparepart_id", komponenId).eq("tiket_id", tiketId);
+  if (error) {
+    catat(komponenId === null ? "tambah komponen" : "ubah komponen", error);
+    return { ok: false, pesan: pesanDatabase(error) };
+  }
+  // Komponen pertama menandai tiket "Ada komponen" bila belum ditentukan.
+  if (s.t.pakai_komponen === null) await s.db.from("tiket").update({ pakai_komponen: true }).eq("tiket_id", tiketId);
+  return { ok: true, pesan: komponenId === null ? "Komponen ditambahkan" : "Komponen diperbarui" };
+}
+
+export async function hapusKomponen(tiketId: string, komponenId: string): Promise<HasilAksi> {
+  if (!POLA_UUID.test(komponenId)) return { ok: false, pesan: "Komponen tidak ditemukan." };
+  const s = await siapkan(tiketId);
+  if ("gagal" in s) return { ok: false, pesan: s.gagal! };
+  const { error } = await s.db.from("spare_part").delete().eq("sparepart_id", komponenId).eq("tiket_id", tiketId);
+  if (error) {
+    catat("hapus komponen", error);
+    return { ok: false, pesan: pesanDatabase(error) };
+  }
+  return { ok: true, pesan: "Komponen dihapus" };
+}
+
+// ---------------------------------------------------------------------------
 // Transaksi & Pengambilan (K3)
 // ---------------------------------------------------------------------------
 
@@ -274,6 +330,10 @@ export async function perbaruiStatus(tiketId: string, isian: IsianStatus): Promi
   // Aturan yang sama dengan dialog dan trigger database, dicek ulang dengan data terbaru.
   const kesalahan = validasiIsianStatus(s.t, isi.data);
   if (kesalahan.length) return { ok: false, pesan: kesalahan[0] };
+  const catatKomponen = isi.data.ke === "menunggu_part" && isi.data.komponen.trim() !== "";
+  if (catatKomponen && s.t.pakai_komponen === false) {
+    return { ok: false, pesan: "Tiket ditandai Tanpa komponen. Ubah menjadi Ada komponen di tab Komponen dulu." };
+  }
 
   // Biaya akhir ditetapkan dulu (lewat ubah_biaya agar tercatat di riwayat), karena trigger
   // mewajibkan biaya > 0 saat status berpindah ke Siap Diambil.
@@ -289,6 +349,22 @@ export async function perbaruiStatus(tiketId: string, isian: IsianStatus): Promi
   if (error) {
     catat("perbarui status", error);
     return { ok: false, pesan: pesanDatabase(error) };
+  }
+
+  // Komponen yang ditunggu langsung tercatat di tab Komponen sebagai "Dipesan".
+  if (catatKomponen) {
+    const komponen = await s.db.from("spare_part").insert({
+      tiket_id: tiketId,
+      nama_komponen: isi.data.komponen.trim(),
+      status_pengadaan: "dipesan",
+      tanggal_pesan: tanggalJakarta(new Date()),
+      estimasi_tiba: isi.data.perkiraanTiba || null,
+    });
+    if (komponen.error) {
+      catat("catat komponen yang ditunggu", komponen.error);
+      return { ok: true, ke: isi.data.ke, pesan: "Status diperbarui, tetapi komponen belum tercatat. Tambahkan di tab Komponen." };
+    }
+    if (s.t.pakai_komponen === null) await s.db.from("tiket").update({ pakai_komponen: true }).eq("tiket_id", tiketId);
   }
   return { ok: true, ke: isi.data.ke };
 }

@@ -39,7 +39,7 @@ test.describe("@login detail tiket", () => {
     for (const [slug, judul] of [
       ["progres", "Riwayat Status"],
       ["estimasi", "Keputusan Pelanggan"],
-      ["komponen", "Segera hadir"],
+      ["komponen", "Komponen Pengganti"],
       ["transaksi", "Pembayaran & Pengambilan"],
     ]) {
       await page.getByRole("navigation", { name: "Bagian detail tiket" }).locator(`a[href$="?tab=${slug}"]`).click();

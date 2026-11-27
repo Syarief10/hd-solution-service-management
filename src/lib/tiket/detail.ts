@@ -11,12 +11,13 @@ export const POLA_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a
 const KOLOM = `
   tiket_id, nomor_tiket, tracking_token, pin_pengambilan, keluhan, kondisi_fisik, biaya, estimasi_selesai, status,
   created_at, closed_at, token_berakhir, diagnosis, estimasi_biaya, keputusan, keputusan_cara,
-  keputusan_alasan, keputusan_at,
+  keputusan_alasan, keputusan_at, pakai_komponen,
   perangkat ( kategori, merk_tipe, warna, serial_number, pelanggan ( nama, no_whatsapp ) ),
   kelengkapan_unit ( kelengkapan_id, nama_item, is_checked_in, is_checked_out ),
   riwayat_status ( riwayat_id, status, catatan_teknis, created_at ),
   catatan_pengerjaan ( catatan_id, isi, created_at ),
   rincian_estimasi ( rincian_id, jenis, uraian, biaya, created_at ),
+  spare_part ( sparepart_id, nama_komponen, status_pengadaan, biaya, lama_garansi_hari, tanggal_pesan, estimasi_tiba, tanggal_tiba, tanggal_pasang ),
   transaksi ( transaksi_id, jenis, metode, nominal, tanggal, created_at )
 `;
 
@@ -32,6 +33,8 @@ export async function ambilDetailTiket(db: Klien, tiketId: string) {
     riwayat_status: urutWaktu(data.riwayat_status),
     catatan_pengerjaan: urutWaktu(data.catatan_pengerjaan),
     rincian_estimasi: urutWaktu(data.rincian_estimasi),
+    // spare_part tidak punya created_at: urutkan menurut nama agar stabil.
+    spare_part: [...data.spare_part].sort((a, b) => a.nama_komponen.localeCompare(b.nama_komponen, "id")),
   };
 }
 
