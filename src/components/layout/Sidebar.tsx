@@ -10,7 +10,7 @@ import { Ikon } from "@/components/ui";
 /** Sidebar desktop (>= 768 px): logo, menu, dan menu pengguna dengan tombol Keluar. */
 export function Sidebar() {
   return (
-    <aside className="sticky top-0 hidden h-screen w-62 shrink-0 flex-col gap-7 overflow-y-auto border-r border-border bg-surface px-3.5 py-5 md:flex">
+    <aside className="sticky top-0 hidden print:hidden! h-screen w-62 shrink-0 flex-col gap-7 overflow-y-auto border-r border-border bg-surface px-3.5 py-5 md:flex">
       <Link href="/dashboard" className="flex items-center gap-2.5 rounded-lg px-2 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
         <LogoHD />
         <span className="flex flex-col gap-0.5">

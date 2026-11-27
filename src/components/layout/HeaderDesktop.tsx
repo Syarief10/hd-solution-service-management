@@ -9,7 +9,7 @@ import { ButtonLink, Ikon } from "@/components/ui";
  */
 export function HeaderDesktop() {
   return (
-    <header className="hidden flex-wrap items-center gap-x-4 gap-y-3 border-b border-border bg-surface px-8 py-3.5 md:flex">
+    <header className="hidden print:hidden! flex-wrap items-center gap-x-4 gap-y-3 border-b border-border bg-surface px-8 py-3.5 md:flex">
       <form action="/tiket" method="get" role="search" className="relative max-w-[440px] flex-[1_1_260px]">
         <label htmlFor="cari-global" className="sr-only">
           Cari tiket
