@@ -29,7 +29,8 @@ test.describe("@login layout desktop", () => {
     await nav.getByRole("link", { name: /Garansi Komponen/ }).click();
     await expect(page).toHaveURL(/\/garansi$/);
     await expect(nav.getByRole("link", { name: /Garansi Komponen/ })).toHaveAttribute("aria-current", "page");
-    await expect(page.getByText("Segera hadir")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Garansi Komponen" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Filter status garansi" })).toBeVisible();
   });
 
   test("header berisi cari global, tanggal, dan Tiket Baru", async ({ page }) => {
