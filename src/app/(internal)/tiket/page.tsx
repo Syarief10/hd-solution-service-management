@@ -288,8 +288,9 @@ async function Isi({ searchParams }: Props) {
         <div role="note" className="flex gap-2.5 rounded-card border border-blue-200 bg-primary-soft p-4 text-[13px] leading-relaxed text-blue-900">
           <Ikon nama="info" className="mt-0.5 shrink-0" />
           <p>
-            Urutan ini adalah <strong>saran</strong> untuk membantu Anda menentukan tindakan. Tiket terbuka yang melewati estimasi selesai tampil lebih dulu
-            (keterlambatan terlama di atas), lalu tiket lain berdasarkan tanggal masuk paling awal. Tiket tanpa estimasi tidak dihitung sebagai terlambat.
+            Urutan ini adalah <strong>saran</strong> untuk membantu Anda menentukan tindakan. Tiket terbuka diurutkan dengan skor AHP-SAW
+            dari lima hal: kedekatan tenggat, keterlambatan, lama status tidak berubah, nilai servis, dan lama menunggu diambil. Bobotnya
+            berasal dari penilaian pemilik. Tiket tanpa estimasi tidak dihitung sebagai terlambat.
           </p>
         </div>
       )}
