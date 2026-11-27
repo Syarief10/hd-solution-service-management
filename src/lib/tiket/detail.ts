@@ -9,22 +9,30 @@ type Klien = SupabaseClient<Database>;
 export const POLA_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const KOLOM = `
-  tiket_id, nomor_tiket, tracking_token, pin_pengambilan, keluhan, biaya, estimasi_selesai, status,
+  tiket_id, nomor_tiket, tracking_token, pin_pengambilan, keluhan, kondisi_fisik, biaya, estimasi_selesai, status,
   created_at, closed_at, token_berakhir, diagnosis, estimasi_biaya, keputusan, keputusan_cara,
   keputusan_alasan, keputusan_at,
   perangkat ( kategori, merk_tipe, warna, serial_number, pelanggan ( nama, no_whatsapp ) ),
   kelengkapan_unit ( kelengkapan_id, nama_item, is_checked_in, is_checked_out ),
   riwayat_status ( riwayat_id, status, catatan_teknis, created_at ),
+  catatan_pengerjaan ( catatan_id, isi, created_at ),
+  rincian_estimasi ( rincian_id, jenis, uraian, biaya, created_at ),
   transaksi ( transaksi_id, jenis, metode, nominal, tanggal, created_at )
 `;
+
+const urutWaktu = <T extends { created_at: string }>(baris: T[]) => [...baris].sort((a, b) => a.created_at.localeCompare(b.created_at));
 
 export async function ambilDetailTiket(db: Klien, tiketId: string) {
   if (!POLA_UUID.test(tiketId)) return null;
   const { data, error } = await db.from("tiket").select(KOLOM).eq("tiket_id", tiketId).maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) return null;
-  const riwayat = [...data.riwayat_status].sort((a, b) => a.created_at.localeCompare(b.created_at));
-  return { ...data, riwayat_status: riwayat };
+  return {
+    ...data,
+    riwayat_status: urutWaktu(data.riwayat_status),
+    catatan_pengerjaan: urutWaktu(data.catatan_pengerjaan),
+    rincian_estimasi: urutWaktu(data.rincian_estimasi),
+  };
 }
 
 export type DetailTiket = NonNullable<Awaited<ReturnType<typeof ambilDetailTiket>>>;

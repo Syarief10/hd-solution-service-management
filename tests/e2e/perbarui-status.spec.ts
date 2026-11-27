@@ -79,7 +79,7 @@ test.describe("@tulis alur utama Iterasi 1", () => {
   }
 
   /** Buat tiket baru lewat Form Penerimaan, buka detailnya, lalu isi diagnosis dan estimasi. */
-  async function siapkanTiketDenganEstimasi(page: Page, nama: string) {
+  async function siapkanTiketDenganEstimasi(page: Page, nama: string, pakaiRincian = false) {
     await masuk(page, "/tiket/baru");
     await page.getByLabel("Nama pelanggan").fill(nama);
     await page.getByLabel("Nomor WhatsApp").fill("0899-0000-2222");
@@ -98,14 +98,32 @@ test.describe("@tulis alur utama Iterasi 1", () => {
     await page.locator('a[href$="?tab=progres"]').click();
     await page.getByLabel("Hasil diagnosis").fill("Tes otomatis: adaptor rusak.");
     await page.getByRole("button", { name: "Simpan Diagnosis" }).click();
+    await page.getByLabel("Tambah catatan").fill("Tes otomatis: adaptor diukur, tidak ada tegangan.");
+    await page.getByRole("button", { name: "Simpan Catatan" }).click();
+    await expect(page.getByText("Tes otomatis: adaptor diukur, tidak ada tegangan.")).toBeVisible();
+
     await page.locator('a[href$="?tab=estimasi"]').click();
-    await page.getByLabel("Total estimasi biaya").fill("150000");
+    if (pakaiRincian) {
+      for (const [jenis, uraian, biaya] of [
+        ["jasa", "Jasa ganti adaptor", "50000"],
+        ["komponen", "Adaptor 19V 65W", "100000"],
+      ]) {
+        await page.getByLabel("Jenis").selectOption(jenis);
+        await page.getByLabel("Uraian").fill(uraian);
+        await page.getByLabel("Biaya", { exact: true }).fill(biaya);
+        await page.getByRole("button", { name: "Tambah Rincian" }).click();
+        await expect(page.getByRole("list", { name: "Rincian estimasi" })).toContainText(uraian);
+      }
+      await expect(page.getByText("Rp 150.000")).toBeVisible();
+    } else {
+      await page.getByLabel("Total estimasi biaya").fill("150000");
+    }
     await page.getByRole("button", { name: "Simpan Estimasi" }).click();
   }
 
   test("terima → diagnosis → estimasi disetujui → dikerjakan → pengujian → siap diambil → bayar dan tutup", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await siapkanTiketDenganEstimasi(page, "Uji E2E Alur Utama");
+    await siapkanTiketDenganEstimasi(page, "Uji E2E Alur Utama", true);
     await page.getByRole("button", { name: "Catat Disetujui" }).click();
     await expect(page.getByText("Disetujui", { exact: true })).toBeVisible();
 

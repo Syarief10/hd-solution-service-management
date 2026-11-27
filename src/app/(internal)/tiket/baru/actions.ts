@@ -31,8 +31,12 @@ export async function simpanTiket(isian: unknown): Promise<HasilSimpan> {
     return { status: "berhasil", tiket };
   } catch (e) {
     // Dicatat tanpa data pelanggan (nama, nomor WA tidak ditulis ke log).
-    const tahap = e instanceof GagalSimpan ? e.tahap : "tidak diketahui";
-    console.error(`[penerimaan] gagal menyimpan pada tahap ${tahap}: ${e instanceof Error ? e.message : String(e)}`);
+    const kode = e instanceof GagalSimpan ? e.kode : null;
+    console.error(`[penerimaan] gagal menyimpan: ${kode ?? "-"} ${e instanceof Error ? e.message : String(e)}`);
+    // P0001: penolakan aturan dari fungsi database, pesannya sudah ramah pengguna.
+    if (kode === "P0001" && e instanceof Error) {
+      return { status: "gagal", pesan: `Tiket belum tersimpan — ${e.message}`, keterangan: "Semua isian Anda tetap ada di formulir ini. Perbaiki isian, lalu coba lagi." };
+    }
     return { status: "gagal", pesan: "Tiket belum tersimpan — koneksi ke server terputus", keterangan: KETERANGAN_KONEKSI };
   }
 }
