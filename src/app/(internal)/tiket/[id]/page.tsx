@@ -12,7 +12,7 @@ import { susunPesanTiket } from "@/lib/tiket/pesan";
 import { isAktif } from "@/lib/tiket/status";
 import { SkeletonTable } from "@/components/ui";
 import { alamatAplikasi } from "@/lib/alamat";
-import { ambilDetailTiket, tabAktif } from "@/lib/tiket/detail";
+import { ambilDetailTiket, tabAktif, urlFotoTiket } from "@/lib/tiket/detail";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Detail Tiket | HD Solution Computer" };
@@ -49,7 +49,7 @@ async function IsiDetail({ params, searchParams }: Props) {
         <div className="flex min-w-0 flex-col gap-4 md:gap-5">
           <NavTab tiketId={t.tiket_id} aktif={aktif} />
           <section aria-label="Isi tab">
-            {aktif === "informasi" && <TabInformasi t={t} alamat={alamat} />}
+            {aktif === "informasi" && <TabInformasi t={t} alamat={alamat} foto={await urlFotoTiket(db, t.foto_perangkat)} />}
             {aktif === "progres" && <TabProgres t={t} />}
             {aktif === "estimasi" && <TabEstimasi t={t} wa={{ nomorWa: wa.nomorWa, pesan: wa.perJenis.estimasi ?? null }} />}
             {aktif === "komponen" && <TabKomponen t={t} sekarang={sekarang} />}

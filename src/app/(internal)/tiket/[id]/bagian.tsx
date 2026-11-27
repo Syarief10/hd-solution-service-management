@@ -14,6 +14,7 @@ import {
   TombolHapusRincian,
   TombolSalin,
 } from "./aksi-klien";
+import { KelolaFoto } from "./foto-klien";
 import { AksiKomponen, PilihanPakaiKomponen, TambahKomponen } from "./komponen-klien";
 import { TombolKirimWa } from "./pemberitahuan-klien";
 import { PerbaruiStatus } from "./perbarui-status";
@@ -170,7 +171,7 @@ function Lintasan({ t }: { t: DetailTiket }) {
 // Tab Informasi Unit (#16)
 // ---------------------------------------------------------------------------
 
-export function TabInformasi({ t, alamat }: { t: DetailTiket; alamat: string }) {
+export function TabInformasi({ t, alamat, foto }: { t: DetailTiket; alamat: string; foto: { foto_id: string; url: string | null }[] }) {
   const p = t.perangkat;
   const pl = p?.pelanggan;
   const aktif = isAktif(t.status);
@@ -230,6 +231,11 @@ export function TabInformasi({ t, alamat }: { t: DetailTiket; alamat: string }) 
           )}
         </Card>
       </div>
+
+      <Card className="flex flex-col gap-3 p-4 md:p-5">
+        <JudulBagian>Foto Kondisi</JudulBagian>
+        <KelolaFoto tiketId={t.tiket_id} foto={foto} bisaUbah={aktif} />
+      </Card>
 
       <Card className="flex flex-col gap-3 p-4 md:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">

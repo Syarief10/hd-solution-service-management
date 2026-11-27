@@ -83,6 +83,31 @@ test.describe("form penerimaan (pratinjau, tanpa login)", () => {
     expect(pesan).toContain("Batalkan penerimaan?");
     await expect(page).toHaveURL(/\/dev\/penerimaan$/);
   });
+
+  test("foto kondisi diperkecil di browser dan file bukan foto ditolak", async ({ page }) => {
+    // Buat JPEG 3000x2000 di browser, lalu kirim lewat input file beserta file teks.
+    const jpeg = await page.evaluate(async () => {
+      const c = document.createElement("canvas");
+      c.width = 3000;
+      c.height = 2000;
+      const x = c.getContext("2d")!;
+      x.fillStyle = "#0f766e";
+      x.fillRect(0, 0, 3000, 2000);
+      const b = await new Promise<Blob>((r) => c.toBlob((h) => r(h!), "image/jpeg", 0.9));
+      return Array.from(new Uint8Array(await b.arrayBuffer()));
+    });
+    await page.locator("#foto-penerimaan").setInputFiles([
+      { name: "kondisi.jpg", mimeType: "image/jpeg", buffer: Buffer.from(jpeg) },
+      { name: "catatan.txt", mimeType: "text/plain", buffer: Buffer.from("bukan foto") },
+    ]);
+    const pratinjau = page.getByRole("list", { name: "Foto yang akan diunggah" }).getByRole("img");
+    await expect(pratinjau).toHaveCount(1);
+    await expect(page.locator("#foto-penerimaan-galat")).toHaveText("File harus berupa foto (JPG, PNG, atau WebP).");
+    const ukuran = await pratinjau.evaluate((img: HTMLImageElement) => [img.naturalWidth, img.naturalHeight]);
+    expect(ukuran).toEqual([1600, 1067]);
+    await page.getByRole("button", { name: "Hapus foto 1" }).click();
+    await expect(pratinjau).toHaveCount(0);
+  });
 });
 
 test.describe("@login form penerimaan", () => {

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, useTransition, type ReactNode } from "rea
 
 import { cekPelanggan, simpanTiket, type HasilSimpan } from "./actions";
 import { KartuBerhasil } from "./kartu-berhasil";
+import { PilihFoto, PratinjauFoto, type FotoDipilih } from "../[id]/foto-klien";
 import {
   Button,
   Card,
@@ -83,6 +84,14 @@ export function FormPenerimaan() {
   const [saranNama, setSaranNama] = useState<string | null>(null);
   const [waktu, setWaktu] = useState<string>("");
   const [menyimpan, mulai] = useTransition();
+  // Foto kondisi (opsional, K9): sudah diperkecil, diunggah setelah tiket tersimpan.
+  const [foto, setFoto] = useState<FotoDipilih[]>([]);
+  const hapusFotoDipilih = (kunci: string) =>
+    setFoto((f) => {
+      const buang = f.find((x) => x.kunci === kunci);
+      if (buang) URL.revokeObjectURL(buang.url);
+      return f.filter((x) => x.kunci !== kunci);
+    });
 
   // Waktu penerimaan di ringkasan; diisi di klien agar sama dengan jam perangkat pemilik.
   useEffect(() => {
@@ -107,7 +116,7 @@ export function FormPenerimaan() {
   const ubahItem = (i: number, perubahan: Partial<IsianPenerimaan["kelengkapan"][number]>) =>
     setIsian((s) => ({ ...s, kelengkapan: s.kelengkapan.map((k, j) => (j === i ? { ...k, ...perubahan } : k)) }));
 
-  const sudahDiisi = JSON.stringify(isian) !== JSON.stringify(isianKosong());
+  const sudahDiisi = JSON.stringify(isian) !== JSON.stringify(isianKosong()) || foto.length > 0;
 
   async function periksaWhatsApp() {
     const nama = await cekPelanggan(isian.whatsapp).catch(() => null);
@@ -151,6 +160,8 @@ export function FormPenerimaan() {
   }
 
   function buatLagi() {
+    foto.forEach((f) => URL.revokeObjectURL(f.url));
+    setFoto([]);
     setIsian(isianKosong());
     setTersimpan(null);
     setSudahKirim(false);
@@ -164,6 +175,7 @@ export function FormPenerimaan() {
       <KartuBerhasil
         tiket={tersimpan}
         pelanggan={{ nama: isian.nama, whatsapp: isian.whatsapp, perangkat: gabungMerkTipe(isian.merek, isian.model) || isian.jenis }}
+        foto={foto}
         onBuatLagi={buatLagi}
       />
     );
@@ -347,6 +359,11 @@ export function FormPenerimaan() {
                 </p>
                 <FieldError idKolom={id("kondisiFisik")} pesan={kesalahan.kondisiFisik} />
               </div>
+            </div>
+            <div className="flex flex-col gap-2.5">
+              <p className="text-[13px] font-semibold text-slate-700">Foto kondisi perangkat</p>
+              <PratinjauFoto foto={foto} hapus={hapusFotoDipilih} />
+              <PilihFoto jumlahSekarang={foto.length} tambah={(baru) => setFoto((f) => [...f, ...baru])} id="foto-penerimaan" />
             </div>
           </Bagian>
 
