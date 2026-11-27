@@ -2,6 +2,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import QRCode from "qrcode";
 import { Suspense } from "react";
 
@@ -25,6 +26,8 @@ async function alamatAplikasi() {
 }
 
 async function IsiTandaTerima({ params }: { params: Promise<{ id: string }> }) {
+  // Klien Supabase memakai Date.now() untuk sesi; tandai sebagai data per permintaan.
+  await connection();
   const { id } = await params;
   if (!POLA_UUID.test(id)) notFound();
 
