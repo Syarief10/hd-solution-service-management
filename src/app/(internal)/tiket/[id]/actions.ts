@@ -5,7 +5,8 @@
 import { z } from "zod";
 
 import { POLA_UUID } from "@/lib/tiket/detail";
-import { isAktif } from "@/lib/tiket/status";
+import { butuhBiaya, susunCatatan, validasiIsianStatus, type IsianStatus } from "@/lib/tiket/perbarui";
+import { DAFTAR_STATUS, isAktif } from "@/lib/tiket/status";
 import { createClient } from "@/lib/supabase/server";
 
 export type HasilAksi = { ok: true; pesan?: string } | { ok: false; pesan: string };
@@ -192,6 +193,47 @@ export async function tutupTiket(tiketId: string, metode: string, pin: string): 
     return { ok: false, pesan: pesanDatabase(error) };
   }
   return { ok: true, pesan: "Pembayaran tercatat dan tiket ditutup" };
+}
+
+// ---------------------------------------------------------------------------
+// Perbarui Status (#18, K1, K13)
+// ---------------------------------------------------------------------------
+
+const skemaStatus = z.object({
+  ke: z.enum(DAFTAR_STATUS),
+  catatan: z.string().max(1000, "Catatan maksimal 1000 karakter."),
+  biaya: z.number().int("Gunakan rupiah tanpa sen.").min(0).max(1_000_000_000, "Nominal terlalu besar."),
+  pengujianLolos: z.boolean(),
+  komponen: z.string().max(120, "Nama komponen maksimal 120 karakter."),
+  perkiraanTiba: z.union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Tanggal tidak valid.")]),
+});
+
+export async function perbaruiStatus(tiketId: string, isian: IsianStatus): Promise<HasilAksi & { ke?: string }> {
+  const isi = skemaStatus.safeParse(isian);
+  if (!isi.success) return { ok: false, pesan: isi.error.issues[0].message };
+  const s = await siapkan(tiketId);
+  if ("gagal" in s) return { ok: false, pesan: s.gagal! };
+
+  // Aturan yang sama dengan dialog dan trigger database, dicek ulang dengan data terbaru.
+  const kesalahan = validasiIsianStatus(s.t, isi.data);
+  if (kesalahan.length) return { ok: false, pesan: kesalahan[0] };
+
+  // Biaya akhir ditetapkan dulu (lewat ubah_biaya agar tercatat di riwayat), karena trigger
+  // mewajibkan biaya > 0 saat status berpindah ke Siap Diambil.
+  if (butuhBiaya(s.t.status, isi.data.ke) && isi.data.biaya !== Number(s.t.biaya)) {
+    const { error } = await s.db.rpc("ubah_biaya", { p_tiket_id: tiketId, p_biaya_baru: isi.data.biaya, p_alasan: "Biaya akhir ditetapkan saat Siap Diambil" });
+    if (error) {
+      catat("tetapkan biaya akhir", error);
+      return { ok: false, pesan: pesanDatabase(error) };
+    }
+  }
+
+  const { error } = await s.db.rpc("perbarui_status", { p_tiket_id: tiketId, p_status: isi.data.ke, p_catatan: susunCatatan(isi.data) || undefined });
+  if (error) {
+    catat("perbarui status", error);
+    return { ok: false, pesan: pesanDatabase(error) };
+  }
+  return { ok: true, ke: isi.data.ke };
 }
 
 // ---------------------------------------------------------------------------
