@@ -44,7 +44,7 @@ async function IsiDetail({ params, searchParams }: Props) {
         {aktif === "informasi" && <TabInformasi t={t} alamat={await alamatAplikasi()} />}
         {aktif === "progres" && <TabProgres t={t} />}
         {aktif === "estimasi" && <TabEstimasi t={t} />}
-        {aktif === "komponen" && <TabKomponen />}
+        {aktif === "komponen" && <TabKomponen t={t} sekarang={sekarang} />}
         {aktif === "transaksi" && <TabTransaksi t={t} />}
       </section>
     </>

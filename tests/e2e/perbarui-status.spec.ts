@@ -128,6 +128,22 @@ test.describe("@tulis alur utama Iterasi 1", () => {
     await expect(page.getByText("Disetujui", { exact: true })).toBeVisible();
 
     await ubahStatus(page, "Dikerjakan");
+    // Komponen ditunggu dari dialog status tercatat di tab Komponen, lalu dilengkapi di sana.
+    await ubahStatus(page, "Menunggu Komponen", async (d) => {
+      await d.getByLabel("Komponen yang ditunggu").fill("Adaptor 19V 65W");
+    });
+    await page.locator('a[href$="?tab=komponen"]').click();
+    const daftar = page.getByRole("list", { name: "Daftar komponen" });
+    await expect(daftar).toContainText("Adaptor 19V 65W");
+    await expect(daftar).toContainText("Dipesan");
+    await page.getByRole("button", { name: "Ubah Adaptor 19V 65W" }).click();
+    await page.getByLabel("Pengadaan").selectOption("tersedia");
+    await page.getByLabel("Tanggal dipasang").fill(new Date().toISOString().slice(0, 10));
+    await page.getByRole("button", { name: "Simpan Perubahan" }).click();
+    await expect(daftar).toContainText("Terpasang");
+    await expect(daftar).toContainText("Saat unit diserahkan");
+
+    await ubahStatus(page, "Dikerjakan");
     await ubahStatus(page, "Pengujian");
     await ubahStatus(page, "Siap Diambil", async (d) => {
       await d.getByLabel("Hasil pengujian lolos").check();
@@ -142,6 +158,10 @@ test.describe("@tulis alur utama Iterasi 1", () => {
     await expect(page.getByText("Pembayaran tercatat")).toBeVisible();
     await expect(page.getByText("Ditutup", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Perbarui Status" })).toHaveCount(0);
+
+    // Setelah unit diserahkan, garansi komponen mulai berjalan.
+    await page.locator('a[href$="?tab=komponen"]').click();
+    await expect(page.getByRole("list", { name: "Daftar komponen" })).toContainText("Aktif · sisa 90 hari");
   });
 
   test("estimasi ditolak → siap diambil tanpa perbaikan → dikembalikan", async ({ page }) => {

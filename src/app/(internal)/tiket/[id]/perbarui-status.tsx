@@ -75,7 +75,7 @@ export function PerbaruiStatus(props: Props) {
         return;
       }
       dialog.current?.close();
-      toast({ judul: "Status diperbarui", keterangan: `${nomorTiket} → ${STATUS[ke as KodeStatus].label}` });
+      toast({ judul: "Status diperbarui", keterangan: hasil.pesan ?? `${nomorTiket} → ${STATUS[ke as KodeStatus].label}` });
       router.refresh();
     });
   }
@@ -241,6 +241,7 @@ export function PerbaruiStatus(props: Props) {
                   </label>
                   <input id="perkiraan-tiba" type="date" value={isian.perkiraanTiba} onChange={(e) => ubah({ perkiraanTiba: e.target.value })} className={KELAS_INPUT} />
                 </div>
+                <p className="text-xs text-orange-900 sm:col-span-2">Komponen ini juga dicatat di tab Komponen sebagai Dipesan. Biaya dan garansinya bisa dilengkapi di sana.</p>
               </div>
             )}
 

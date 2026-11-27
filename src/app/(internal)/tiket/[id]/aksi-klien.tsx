@@ -22,12 +22,12 @@ import { formatRupiah } from "@/lib/format";
 import { syaratTutupTiket } from "@/lib/tiket/detail";
 import { JENIS_RINCIAN, LABEL_JENIS_RINCIAN, type JenisRincian } from "@/lib/tiket/estimasi";
 
-const KELAS_INPUT =
+export const KELAS_INPUT =
   "block min-h-11 w-full rounded-lg border border-slate-300 bg-surface px-3 text-sm text-ink placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 md:min-h-[42px]";
-const KELAS_LABEL = "mb-1.5 block text-[13px] font-semibold text-slate-700";
+export const KELAS_LABEL = "mb-1.5 block text-[13px] font-semibold text-slate-700";
 
 /** Jalankan server action, tampilkan toast, lalu muat ulang data halaman. */
-function useAksi() {
+export function useAksi() {
   const router = useRouter();
   const toast = useToast();
   const [memproses, mulai] = useTransition();
@@ -54,7 +54,7 @@ function useAksi() {
   return { jalankan, memproses, galat };
 }
 
-function PesanGagal({ id, pesan }: { id: string; pesan: string | null }) {
+export function PesanGagal({ id, pesan }: { id: string; pesan: string | null }) {
   if (!pesan) return null;
   return (
     <p id={id} role="alert" className="flex items-start gap-1.5 text-[13px] text-red-700">
@@ -65,12 +65,12 @@ function PesanGagal({ id, pesan }: { id: string; pesan: string | null }) {
 }
 
 /** Angka rupiah dari isian bebas: "595.000", "Rp 595000" → 595000. */
-function angka(teks: string): number {
+export function angka(teks: string): number {
   const d = teks.replace(/\D/g, "");
   return d ? Number(d) : NaN;
 }
 
-const formatIsian = (n: number | null) => (n === null || Number.isNaN(n) ? "" : n.toLocaleString("id-ID"));
+export const formatIsian = (n: number | null) => (n === null || Number.isNaN(n) ? "" : n.toLocaleString("id-ID"));
 
 // ---------------------------------------------------------------------------
 // Informasi Unit
