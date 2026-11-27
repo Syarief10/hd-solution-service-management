@@ -333,9 +333,8 @@ export function FormPenerimaan() {
                   onChange={(e) => ubah("kondisiFisik", e.target.value)}
                   className={cx(kelasInput(Boolean(kesalahan.kondisiFisik)), "py-2.5")}
                 />
-                <p id="catatan-fisik" className="mt-1.5 flex items-start gap-1.5 text-xs text-amber-800">
-                  <Ikon nama="info" className="mt-px size-3.5" />
-                  Diperiksa bersama pelanggan, tetapi belum tersimpan di sistem sampai pembaruan database.
+                <p id="catatan-fisik" className="mt-1.5 text-xs text-muted">
+                  Diperiksa bersama pelanggan. Setelah tiket disimpan, kondisi awal tidak bisa diubah.
                 </p>
                 <FieldError idKolom={id("kondisiFisik")} pesan={kesalahan.kondisiFisik} />
               </div>

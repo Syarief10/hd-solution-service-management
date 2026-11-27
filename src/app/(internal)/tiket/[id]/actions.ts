@@ -1,10 +1,11 @@
 "use server";
 
-// Mutasi Detail Tiket (issue #17, #19, #20). Hanya memakai kolom dan fungsi yang sudah ada di skema;
-// aturan bisnis tetap dijaga trigger database, aplikasi memeriksa lebih awal agar pesannya ramah.
+// Mutasi Detail Tiket (issue #17, #19, #20). Aturan bisnis dijaga trigger database;
+// aplikasi memeriksa lebih awal agar pesannya ramah.
 import { z } from "zod";
 
 import { POLA_UUID } from "@/lib/tiket/detail";
+import { skemaCatatan, skemaRincian, type IsianRincian } from "@/lib/tiket/estimasi";
 import { butuhBiaya, susunCatatan, validasiIsianStatus, type IsianStatus } from "@/lib/tiket/perbarui";
 import { DAFTAR_STATUS, isAktif } from "@/lib/tiket/status";
 import { createClient } from "@/lib/supabase/server";
@@ -56,12 +57,27 @@ export async function simpanDiagnosis(tiketId: string, diagnosis: string): Promi
   return { ok: true, pesan: "Hasil diagnosis tersimpan" };
 }
 
+/** Tambah catatan pengerjaan bertanggal tanpa mengubah status (K7). Waktu diisi database. */
+export async function tambahCatatan(tiketId: string, isi: string): Promise<HasilAksi> {
+  const catatan = skemaCatatan.safeParse(isi);
+  if (!catatan.success) return { ok: false, pesan: catatan.error.issues[0].message };
+  const s = await siapkan(tiketId);
+  if ("gagal" in s) return { ok: false, pesan: s.gagal! };
+  const { error } = await s.db.from("catatan_pengerjaan").insert({ tiket_id: tiketId, isi: catatan.data });
+  if (error) {
+    catat("tambah catatan", error);
+    return { ok: false, pesan: pesanDatabase(error) };
+  }
+  return { ok: true, pesan: "Catatan tersimpan" };
+}
+
 // ---------------------------------------------------------------------------
 // Estimasi & Persetujuan (K4)
 // ---------------------------------------------------------------------------
 
 const skemaEstimasi = z.object({
-  biaya: z.number({ error: "Isi total estimasi." }).int("Gunakan rupiah tanpa sen.").min(0, "Tidak boleh negatif.").max(1_000_000_000, "Nominal terlalu besar."),
+  /** null jika total mengikuti rincian (atau belum diisi). */
+  biaya: z.number().int("Gunakan rupiah tanpa sen.").min(0, "Tidak boleh negatif.").max(1_000_000_000, "Nominal terlalu besar.").nullable(),
   selesai: z.union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Tanggal tidak valid.")]),
 });
 
@@ -70,16 +86,57 @@ export async function simpanEstimasi(tiketId: string, isian: z.input<typeof skem
   if (!isi.success) return { ok: false, pesan: isi.error.issues[0].message };
   const s = await siapkan(tiketId);
   if ("gagal" in s) return { ok: false, pesan: s.gagal! };
-  if (s.t.keputusan !== "menunggu") return { ok: false, pesan: "Estimasi sudah diputuskan pelanggan. Buka ulang keputusan untuk mengubahnya." };
+  if (s.t.keputusan !== "menunggu") return { ok: false, pesan: SUDAH_DIPUTUSKAN };
+
+  // Jika ada rincian, total dihitung database dari barisnya; hanya tanggal yang disimpan di sini.
+  const rincian = await s.db.from("rincian_estimasi").select("rincian_id", { count: "exact", head: true }).eq("tiket_id", tiketId);
+  if (rincian.error) {
+    catat("cek rincian estimasi", rincian.error);
+    return { ok: false, pesan: GAGAL_UMUM };
+  }
+  const adaRincian = (rincian.count ?? 0) > 0;
+  if (!adaRincian && isi.data.biaya === null) return { ok: false, pesan: "Isi total estimasi atau tambahkan rincian." };
+
   const { error } = await s.db
     .from("tiket")
-    .update({ estimasi_biaya: isi.data.biaya, estimasi_selesai: isi.data.selesai || null })
+    .update(adaRincian ? { estimasi_selesai: isi.data.selesai || null } : { estimasi_biaya: isi.data.biaya, estimasi_selesai: isi.data.selesai || null })
     .eq("tiket_id", tiketId);
   if (error) {
     catat("simpan estimasi", error);
     return { ok: false, pesan: pesanDatabase(error) };
   }
   return { ok: true, pesan: "Estimasi tersimpan" };
+}
+
+const SUDAH_DIPUTUSKAN = "Estimasi sudah diputuskan pelanggan. Buka ulang keputusan untuk mengubahnya.";
+
+/** Tambah satu baris rincian estimasi. Total estimasi diperbarui database. */
+export async function tambahRincian(tiketId: string, isian: IsianRincian): Promise<HasilAksi> {
+  const isi = skemaRincian.safeParse(isian);
+  if (!isi.success) return { ok: false, pesan: isi.error.issues[0].message };
+  const s = await siapkan(tiketId);
+  if ("gagal" in s) return { ok: false, pesan: s.gagal! };
+  if (s.t.keputusan !== "menunggu") return { ok: false, pesan: SUDAH_DIPUTUSKAN };
+  const { error } = await s.db.from("rincian_estimasi").insert({ tiket_id: tiketId, ...isi.data });
+  if (error) {
+    catat("tambah rincian estimasi", error);
+    return { ok: false, pesan: pesanDatabase(error) };
+  }
+  return { ok: true, pesan: "Rincian ditambahkan" };
+}
+
+/** Hapus satu baris rincian. Menghapus baris terakhir mengosongkan total estimasi. */
+export async function hapusRincian(tiketId: string, rincianId: string): Promise<HasilAksi> {
+  if (!POLA_UUID.test(rincianId)) return { ok: false, pesan: "Rincian tidak ditemukan." };
+  const s = await siapkan(tiketId);
+  if ("gagal" in s) return { ok: false, pesan: s.gagal! };
+  if (s.t.keputusan !== "menunggu") return { ok: false, pesan: SUDAH_DIPUTUSKAN };
+  const { error } = await s.db.from("rincian_estimasi").delete().eq("rincian_id", rincianId).eq("tiket_id", tiketId);
+  if (error) {
+    catat("hapus rincian estimasi", error);
+    return { ok: false, pesan: pesanDatabase(error) };
+  }
+  return { ok: true, pesan: "Rincian dihapus" };
 }
 
 const skemaKeputusan = z

@@ -7,8 +7,11 @@ import {
   bukaUlangKeputusan,
   buatUlangAkses,
   catatKeputusan,
+  hapusRincian,
   simpanDiagnosis,
   simpanEstimasi,
+  tambahCatatan,
+  tambahRincian,
   tandaiKelengkapan,
   tutupTiket,
   ubahBiaya,
@@ -17,6 +20,7 @@ import {
 import { Button, cx, FieldError, Ikon, useToast } from "@/components/ui";
 import { formatRupiah } from "@/lib/format";
 import { syaratTutupTiket } from "@/lib/tiket/detail";
+import { JENIS_RINCIAN, LABEL_JENIS_RINCIAN, type JenisRincian } from "@/lib/tiket/estimasi";
 
 const KELAS_INPUT =
   "block min-h-11 w-full rounded-lg border border-slate-300 bg-surface px-3 text-sm text-ink placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 md:min-h-[42px]";
@@ -153,39 +157,92 @@ export function FormDiagnosis({ tiketId, awal }: { tiketId: string; awal: string
   );
 }
 
+export function FormCatatan({ tiketId }: { tiketId: string }) {
+  const [isi, setIsi] = useState("");
+  const { jalankan, memproses, galat } = useAksi();
+  return (
+    <form
+      className="flex flex-col gap-2.5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        jalankan(() => tambahCatatan(tiketId, isi), () => setIsi(""));
+      }}
+    >
+      <label htmlFor="catatan-baru" className={KELAS_LABEL}>
+        Tambah catatan
+      </label>
+      <textarea
+        id="catatan-baru"
+        rows={2}
+        maxLength={1000}
+        value={isi}
+        onChange={(e) => setIsi(e.target.value)}
+        aria-describedby={galat ? "galat-catatan" : "petunjuk-catatan"}
+        placeholder="Tulis catatan pengerjaan…"
+        className={cx(KELAS_INPUT, "py-2.5")}
+      />
+      <p id="petunjuk-catatan" className="text-xs text-muted">
+        Catatan internal, tidak tampil ke pelanggan. Tidak bisa diubah setelah disimpan.
+      </p>
+      <PesanGagal id="galat-catatan" pesan={galat} />
+      <Button type="submit" varian="sekunder" className="self-start" disabled={memproses || !isi.trim()}>
+        {memproses ? "Menyimpan…" : "Simpan Catatan"}
+      </Button>
+    </form>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Estimasi & Persetujuan
 // ---------------------------------------------------------------------------
 
-export function FormEstimasi({ tiketId, biaya, selesai }: { tiketId: string; biaya: number | null; selesai: string | null }) {
+export function FormEstimasi({
+  tiketId,
+  biaya,
+  selesai,
+  adaRincian,
+}: {
+  tiketId: string;
+  biaya: number | null;
+  selesai: string | null;
+  /** Jika ada rincian, total dihitung database dan tidak diisi langsung. */
+  adaRincian: boolean;
+}) {
   const [nominal, setNominal] = useState(formatIsian(biaya));
   const [tanggal, setTanggal] = useState(selesai ?? "");
   const { jalankan, memproses, galat } = useAksi();
 
   function kirim(e: FormEvent) {
     e.preventDefault();
-    jalankan(() => simpanEstimasi(tiketId, { biaya: angka(nominal), selesai: tanggal }));
+    const total = angka(nominal);
+    jalankan(() => simpanEstimasi(tiketId, { biaya: adaRincian || Number.isNaN(total) ? null : total, selesai: tanggal }));
   }
 
   return (
     <form onSubmit={kirim} className="flex flex-col gap-3.5">
       <div className="grid gap-3.5 sm:grid-cols-2">
-        <div>
-          <label htmlFor="estimasi-biaya" className={KELAS_LABEL}>
-            Total estimasi biaya
-          </label>
-          <div className="relative">
-            <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted">Rp</span>
-            <input
-              id="estimasi-biaya"
-              inputMode="numeric"
-              value={nominal}
-              onChange={(e) => setNominal(formatIsian(angka(e.target.value)))}
-              placeholder="595.000"
-              className={cx(KELAS_INPUT, "pl-9 tabular-nums")}
-            />
+        {!adaRincian && (
+          <div>
+            <label htmlFor="estimasi-biaya" className={KELAS_LABEL}>
+              Total estimasi biaya
+            </label>
+            <div className="relative">
+              <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted">Rp</span>
+              <input
+                id="estimasi-biaya"
+                inputMode="numeric"
+                value={nominal}
+                onChange={(e) => setNominal(formatIsian(angka(e.target.value)))}
+                aria-describedby="petunjuk-total"
+                placeholder="595.000"
+                className={cx(KELAS_INPUT, "pl-9 tabular-nums")}
+              />
+            </div>
+            <p id="petunjuk-total" className="mt-1.5 text-xs text-muted">
+              Atau tambahkan rincian di atas; total akan dihitung otomatis.
+            </p>
           </div>
-        </div>
+        )}
         <div>
           <label htmlFor="estimasi-selesai" className={KELAS_LABEL}>
             Perkiraan selesai
@@ -193,12 +250,104 @@ export function FormEstimasi({ tiketId, biaya, selesai }: { tiketId: string; bia
           <input id="estimasi-selesai" type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className={KELAS_INPUT} />
         </div>
       </div>
-      <p className="text-xs text-muted">Rincian per baris jasa dan komponen belum tersedia (menunggu pembaruan database). Tulis rinciannya di hasil diagnosis bila perlu.</p>
       <PesanGagal id="galat-estimasi" pesan={galat} />
       <Button type="submit" className="self-start" disabled={memproses}>
         {memproses ? "Menyimpan…" : "Simpan Estimasi"}
       </Button>
     </form>
+  );
+}
+
+export function FormRincian({ tiketId }: { tiketId: string }) {
+  const [jenis, setJenis] = useState<JenisRincian>("jasa");
+  const [uraian, setUraian] = useState("");
+  const [nominal, setNominal] = useState("");
+  const { jalankan, memproses, galat } = useAksi();
+
+  function kirim(e: FormEvent) {
+    e.preventDefault();
+    jalankan(
+      () => tambahRincian(tiketId, { jenis, uraian, biaya: angka(nominal) }),
+      () => {
+        setUraian("");
+        setNominal("");
+      },
+    );
+  }
+
+  return (
+    <form onSubmit={kirim} aria-label="Tambah rincian estimasi" className="flex flex-col gap-2.5 rounded-lg border border-dashed border-slate-300 p-3">
+      <div className="grid gap-2.5 sm:grid-cols-[110px_minmax(0,1fr)_140px]">
+        <div>
+          <label htmlFor="rincian-jenis" className={KELAS_LABEL}>
+            Jenis
+          </label>
+          <select id="rincian-jenis" value={jenis} onChange={(e) => setJenis(e.target.value as JenisRincian)} className={KELAS_INPUT}>
+            {JENIS_RINCIAN.map((j) => (
+              <option key={j} value={j}>
+                {LABEL_JENIS_RINCIAN[j]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="rincian-uraian" className={KELAS_LABEL}>
+            Uraian
+          </label>
+          <input
+            id="rincian-uraian"
+            value={uraian}
+            maxLength={120}
+            onChange={(e) => setUraian(e.target.value)}
+            placeholder={jenis === "jasa" ? "Jasa perbaikan motherboard" : "IC Charging BQ24780S"}
+            className={KELAS_INPUT}
+          />
+        </div>
+        <div>
+          <label htmlFor="rincian-biaya" className={KELAS_LABEL}>
+            Biaya
+          </label>
+          <div className="relative">
+            <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted">Rp</span>
+            <input
+              id="rincian-biaya"
+              inputMode="numeric"
+              value={nominal}
+              onChange={(e) => setNominal(formatIsian(angka(e.target.value)))}
+              placeholder="350.000"
+              className={cx(KELAS_INPUT, "pl-9 tabular-nums")}
+            />
+          </div>
+        </div>
+      </div>
+      <PesanGagal id="galat-rincian" pesan={galat} />
+      <Button type="submit" varian="sekunder" ukuran="kecil" ikon="plus" className="min-h-11 self-start md:min-h-9" disabled={memproses}>
+        {memproses ? "Menambahkan…" : "Tambah Rincian"}
+      </Button>
+    </form>
+  );
+}
+
+export function TombolHapusRincian({ tiketId, rincianId, uraian }: { tiketId: string; rincianId: string; uraian: string }) {
+  const { jalankan, memproses, galat } = useAksi();
+  return (
+    <>
+      <button
+        type="button"
+        aria-label={`Hapus rincian ${uraian}`}
+        title={galat ?? "Hapus rincian"}
+        disabled={memproses}
+        onClick={() => jalankan(() => hapusRincian(tiketId, rincianId))}
+        className="-my-2 flex size-11 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 md:size-9"
+      >
+        <Ikon nama="x" className="size-4" />
+      </button>
+      {galat && (
+        <span role="alert" className="sr-only">
+          {galat}
+        </span>
+      )}
+    </>
   );
 }
 

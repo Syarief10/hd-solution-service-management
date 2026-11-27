@@ -2,13 +2,16 @@
 import type { ReactNode } from "react";
 
 import {
+  FormCatatan,
   FormDiagnosis,
   FormEstimasi,
   FormKeputusan,
   FormPengambilan,
+  FormRincian,
   FormUbahBiaya,
   TombolBuatUlangAkses,
   TombolBukaUlang,
+  TombolHapusRincian,
   TombolSalin,
 } from "./aksi-klien";
 import { PerbaruiStatus } from "./perbarui-status";
@@ -21,6 +24,7 @@ import {
   waktuDiagnosis,
   type DetailTiket,
 } from "@/lib/tiket/detail";
+import { LABEL_JENIS_RINCIAN, type JenisRincian } from "@/lib/tiket/estimasi";
 import { formatToken, pathStatus } from "@/lib/tiket/kode-akses";
 import { isAktif, menungguPersetujuan, STATUS, tampilanStatus } from "@/lib/tiket/status";
 import { hariTerlambat, jatuhTempoBesok } from "@/lib/tiket/terlambat";
@@ -214,7 +218,11 @@ export function TabInformasi({ t, alamat }: { t: DetailTiket; alamat: string }) 
 
         <Card className="flex flex-col gap-2 p-4 md:p-5">
           <JudulBagian>Kondisi Fisik Awal</JudulBagian>
-          <p className="text-[13px] text-muted">Belum tersimpan di sistem (menunggu pembaruan database). Lihat catatan saat penerimaan.</p>
+          {t.kondisi_fisik ? (
+            <p className="text-[13px] leading-relaxed whitespace-pre-line text-slate-700">{t.kondisi_fisik}</p>
+          ) : (
+            <p className="text-[13px] text-muted">Tidak tercatat. Tiket ini dibuat sebelum kondisi fisik awal disimpan sistem.</p>
+          )}
         </Card>
       </div>
 
@@ -268,9 +276,21 @@ export function TabProgres({ t }: { t: DetailTiket }) {
             <p className="text-[13px] leading-relaxed whitespace-pre-line text-slate-700">{t.diagnosis || "Tidak ada catatan diagnosis."}</p>
           )}
         </Card>
-        <Card className="flex flex-col gap-2 p-4 md:p-5">
+        <Card className="flex flex-col gap-3 p-4 md:p-5">
           <JudulBagian>Catatan Pengerjaan</JudulBagian>
-          <p className="text-[13px] text-muted">Segera hadir. Catatan pengerjaan bertanggal menunggu pembaruan database; sementara itu, catatan tiap tahap tersimpan di riwayat status.</p>
+          {t.catatan_pengerjaan.length === 0 ? (
+            <p className="text-[13px] text-muted">{aktif ? "Belum ada catatan. Catat langkah kerja tanpa mengubah status." : "Tidak ada catatan pengerjaan."}</p>
+          ) : (
+            <ul className="flex flex-col gap-2 text-[13px]">
+              {t.catatan_pengerjaan.map((c) => (
+                <li key={c.catatan_id} className="flex flex-col gap-0.5 border-l-2 border-slate-200 pl-3">
+                  <span className="text-xs text-muted tabular-nums">{formatTanggalWaktu(c.created_at)}</span>
+                  <span className="break-words whitespace-pre-line text-slate-700">{c.isi}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {aktif && <FormCatatan tiketId={t.tiket_id} />}
         </Card>
       </div>
 
@@ -306,18 +326,42 @@ export function TabEstimasi({ t }: { t: DetailTiket }) {
   const aktif = isAktif(t.status);
   const menunggu = t.keputusan === "menunggu";
   const bisaBukaUlang = aktif && !menunggu && ["diterima", "didiagnosis"].includes(t.status);
+  const bisaUbah = aktif && menunggu;
+  const rincian = t.rincian_estimasi;
 
   return (
     <div className="grid items-start gap-4 lg:grid-cols-2">
       <Card className="flex flex-col gap-3 p-4 md:p-5">
         <JudulBagian>Estimasi Biaya</JudulBagian>
-        {aktif && menunggu ? (
-          <FormEstimasi tiketId={t.tiket_id} biaya={t.estimasi_biaya} selesai={t.estimasi_selesai} />
+
+        {rincian.length > 0 && (
+          <ul aria-label="Rincian estimasi" className="flex flex-col text-[13px]">
+            {rincian.map((r) => (
+              <li key={r.rincian_id} className="flex items-center gap-3 border-b border-border py-2.5">
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="break-words text-ink">{r.uraian}</span>
+                  <span className="text-xs text-muted">{LABEL_JENIS_RINCIAN[r.jenis as JenisRincian] ?? r.jenis}</span>
+                </span>
+                <span className="shrink-0 tabular-nums">{formatRupiah(r.biaya)}</span>
+                {bisaUbah && <TombolHapusRincian tiketId={t.tiket_id} rincianId={r.rincian_id} uraian={r.uraian} />}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {(rincian.length > 0 || !bisaUbah) && (
+          <p className="flex items-baseline justify-between gap-3 text-[13px] font-semibold">
+            Total estimasi
+            <strong className="text-lg tabular-nums">{t.estimasi_biaya === null ? "Belum diisi" : formatRupiah(t.estimasi_biaya)}</strong>
+          </p>
+        )}
+
+        {bisaUbah && <FormRincian tiketId={t.tiket_id} />}
+
+        {bisaUbah ? (
+          <FormEstimasi tiketId={t.tiket_id} biaya={t.estimasi_biaya} selesai={t.estimasi_selesai} adaRincian={rincian.length > 0} />
         ) : (
           <dl className={KELAS_DL}>
-            <Baris label="Total estimasi">
-              <strong className="tabular-nums">{t.estimasi_biaya === null ? "Belum diisi" : formatRupiah(t.estimasi_biaya)}</strong>
-            </Baris>
             <Baris label="Perkiraan selesai">{t.estimasi_selesai ? formatTanggal(t.estimasi_selesai) : "Belum diisi"}</Baris>
           </dl>
         )}

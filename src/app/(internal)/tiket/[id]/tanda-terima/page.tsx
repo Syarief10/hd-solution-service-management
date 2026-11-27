@@ -26,7 +26,7 @@ async function IsiTandaTerima({ params }: { params: Promise<{ id: string }> }) {
   const { data: t } = await db
     .from("tiket")
     .select(
-      "nomor_tiket, tracking_token, pin_pengambilan, keluhan, created_at, perangkat ( kategori, merk_tipe, serial_number, pelanggan ( nama, no_whatsapp ) ), kelengkapan_unit ( nama_item, is_checked_in )",
+      "nomor_tiket, tracking_token, pin_pengambilan, keluhan, kondisi_fisik, created_at, perangkat ( kategori, merk_tipe, serial_number, pelanggan ( nama, no_whatsapp ) ), kelengkapan_unit ( nama_item, is_checked_in )",
     )
     .eq("tiket_id", id)
     .maybeSingle();
@@ -64,6 +64,12 @@ async function IsiTandaTerima({ params }: { params: Promise<{ id: string }> }) {
         <dd className="tabular-nums">{t.perangkat.serial_number || "—"}</dd>
         <dt className="text-muted">Keluhan</dt>
         <dd className="whitespace-pre-line">{t.keluhan}</dd>
+        {t.kondisi_fisik && (
+          <>
+            <dt className="text-muted">Kondisi awal</dt>
+            <dd className="whitespace-pre-line">{t.kondisi_fisik}</dd>
+          </>
+        )}
         <dt className="text-muted">Kelengkapan</dt>
         <dd>{kelengkapan.length ? kelengkapan.join(", ") : "Tidak ada yang diserahkan"}</dd>
       </dl>
